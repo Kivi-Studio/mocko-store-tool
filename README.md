@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Screenshot Creator
 
-## Getting Started
+Ein Tool zum Erstellen von **App Store & Google Play Store Screenshots** — mit
+Device-Frames (iPhone, iPad, Pixel), Hintergründen (Solid/Gradient),
+Text-Overlays und PNG-Export. Läuft vollständig im Browser; alle Daten werden
+lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
 
-First, run the development server:
+## Funktionsumfang
+
+- **Drei-Ebenen-Struktur:** Projekt (eine App) → Design (eine Sammlung wie
+  „App Store" oder „Play Store") → Storebild (ein einzelnes, exportierbares PNG).
+- **Editor** pro Storebild: Device-Frames platzieren/skalieren/rotieren,
+  Hintergrund, Text-Overlays, Format & Export-Größe.
+- **Duplizieren** von Storebildern und ganzen Designs (z. B. App-Store-Set
+  klonen und auf Android-Formate umstellen).
+- **Import/Export:** einzelne Designs als `.design`-Datei sichern/teilen,
+  Storebilder gebündelt als PNG-`.zip` exportieren.
+- **Undo/Redo**, automatische Persistenz (IndexedDB) und PWA-Support
+  (installierbar, offline-fähig).
+
+## Voraussetzungen
+
+| Werkzeug    | Version                                                    |
+| ----------- | ---------------------------------------------------------- |
+| **Node.js** | `22` (siehe [`.nvmrc`](.nvmrc)); Minimum `>=20.9`          |
+| **npm**     | wird mit Node ausgeliefert (Lockfile: `package-lock.json`) |
+| **Browser** | aktueller Browser mit IndexedDB-Support                    |
+
+Es werden **keine** Umgebungsvariablen, Datenbank oder API-Keys benötigt — die
+App ist vollständig clientseitig.
+
+Wenn du [nvm](https://github.com/nvm-sh/nvm) nutzt, übernimmt es die Node-Version
+aus `.nvmrc`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nvm install   # installiert die in .nvmrc gepinnte Version
+nvm use
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 1. Repository klonen
+git clone <repo-url>
+cd kivi-studio-store-tool
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 2. Abhängigkeiten installieren (deterministisch, gemäß Lockfile)
+npm ci          # oder: npm install
 
-## Learn More
+# 3. Dev-Server starten
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Anschließend [http://localhost:3000](http://localhost:3000) im Browser öffnen.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## npm-Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Script                 | Beschreibung                                            |
+| ---------------------- | ------------------------------------------------------- |
+| `npm run dev`          | Startet den Next.js-Entwicklungsserver (Port 3000)      |
+| `npm run build`        | Erstellt den Produktions-Build                          |
+| `npm run start`        | Startet den Produktions-Server (nach `build`)           |
+| `npm run lint`         | ESLint                                                  |
+| `npm run typecheck`    | `next typegen` + TypeScript-Typprüfung (`tsc --noEmit`) |
+| `npm run format`       | Prettier — formatiert alle Dateien                      |
+| `npm run format:check` | Prettier — prüft Formatierung ohne Änderungen           |
+| `npm test`             | Führt die Test-Suite aus (Vitest, einmalig)             |
+| `npm run test:watch`   | Vitest im Watch-Modus                                   |
+| `npm run check`        | Alles zusammen: Lint + Typecheck + Format-Check + Tests |
 
-## Deploy on Vercel
+Vor einem Commit empfiehlt sich `npm run check`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Tech-Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **[Next.js](https://nextjs.org) 16** (App Router) + **React 19** + **TypeScript**
+- **[Tailwind CSS v4](https://tailwindcss.com)** mit shadcn-/[Base UI](https://base-ui.com)-Komponenten
+- **[Zustand](https://zustand.docs.pmnd.rs) 5** für State, **[zundo](https://github.com/charkour/zundo)** für Undo/Redo
+- **[idb-keyval](https://github.com/jakearchibald/idb-keyval)** für IndexedDB-Persistenz
+- **[html-to-image](https://github.com/bubkoo/html-to-image)** + **[JSZip](https://stuk.github.io/jszip/)** + **file-saver** für den Export
+- **[Vitest](https://vitest.dev)** + Testing Library + `jsdom` + `fake-indexeddb` für Tests
+
+## Projektstruktur
+
+```
+src/
+  app/                 # Next.js App Router
+    page.tsx           # /              – Projektübersicht
+    project/[id]/      # /project/[id]  – Designs eines Projekts
+    design/[id]/       # /design/[id]   – Storebilder eines Designs
+    editor/[id]/       # /editor/[id]   – Editor für ein einzelnes Storebild
+    manifest.ts        # PWA-Manifest
+  components/
+    editor/            # Canvas, Frames, Text-Layer, Toolbar
+    gallery/           # Projekt-/Design-/Storebild-Karten & Galerien
+    panels/            # Editor-Seitenpanels (Format, Background, Frames, Text, Export)
+    ui/                # wiederverwendbare UI-Primitives
+  lib/                 # Domain-Typen, Geräte/Export-Größen, Export, IndexedDB, Utils
+  store/               # Zustand-Store (Projekte/Designs/Storebilder, Undo/Redo)
+```
+
+## Hinweis für die Weiterentwicklung
+
+Dieses Projekt nutzt eine Next.js-Version mit ggf. abweichenden APIs und
+Konventionen. Siehe [`AGENTS.md`](AGENTS.md) — die relevanten Guides liegen unter
+`node_modules/next/dist/docs/` und sollten vor Änderungen konsultiert werden.
+</content>
+</invoke>
