@@ -50,7 +50,10 @@ export function ProjectCard({ project }: { project: Project }) {
       return;
     }
     try {
-      await exportProjectZip(project);
+      await exportProjectZip(
+        project,
+        project.languages.map((l) => l.code),
+      );
       toast.success(`Exported ${count} screenshot(s) as ZIP`);
     } catch (error) {
       console.error(error);
@@ -78,6 +81,7 @@ export function ProjectCard({ project }: { project: Project }) {
           <ShotCanvas
             project={project}
             shot={cover}
+            language={project.defaultLanguage}
             className="h-auto max-h-full w-auto max-w-full rounded shadow-sm"
           />
         ) : (

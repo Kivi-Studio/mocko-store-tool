@@ -2,7 +2,9 @@ import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import type {
   Background,
+  Caption,
   DeviceStyle,
+  Language,
   Project,
   Shot,
   TextAlign,
@@ -11,6 +13,7 @@ import type {
 import { isPresetId } from "@/lib/presets";
 import { safeFont } from "@/lib/fonts";
 import { safeColor } from "@/lib/color";
+import { DEFAULT_LANGUAGE, isValidLangCode } from "@/lib/locales";
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_DEVICE,
@@ -27,6 +30,7 @@ import {
   GRADIENT_ANGLE_MAX,
   GRADIENT_ANGLE_MIN,
   MAX_IMAGE_BYTES,
+  MAX_LANGUAGES,
   MAX_MANIFEST_CHARS,
   MAX_PROJECT_FILE_BYTES,
   MAX_SHOTS_PER_PROJECT,
@@ -37,14 +41,15 @@ import {
 } from "@/lib/limits";
 
 export const PROJECT_FORMAT = "screenshot-studio";
-export const PROJECT_VERSION = 2;
+export const PROJECT_VERSION = 3;
 export const PROJECT_FILE_EXT = ".studio";
 
 /**
  * The `.studio` file is a ZIP container: a small `manifest.json` describing the
  * project plus the raw image bytes under `images/`. Storing images as binary
  * (instead of base64 in JSON) avoids the ~33% base64 inflation and keeps the
- * manifest small and fast to parse.
+ * manifest small and fast to parse. The project carries its `languages` and a
+ * per-language `captions` map on each shot.
  */
 
 /** A reference from the manifest to an image entry inside the archive. */
@@ -55,7 +60,10 @@ type ManifestBackground =
   | { type: "gradient"; from: string; to: string; angle: number }
   | { type: "image"; image: ImageRef };
 
-type ManifestShot = { image: ImageRef; claim: string; sub: string };
+type ManifestShot = {
+  image: ImageRef;
+  captions: Record<string, Caption>;
+};
 
 type Manifest = {
   format: string;
@@ -64,6 +72,8 @@ type Manifest = {
   project: {
     name: string;
     presetId: string;
+    languages: Language[];
+    defaultLanguage: string;
     background: ManifestBackground;
     text: TextStyle;
     device: DeviceStyle;
@@ -94,10 +104,6 @@ function parseDataUrl(
 // Export
 // ---------------------------------------------------------------------------
 
-/**
- * Adds an image data URL to the archive under `images/<name>` and returns a
- * manifest reference to it (or null when there is no/invalid image).
- */
 function addImage(zip: JSZip, dataUrl: string | null, name: string): ImageRef {
   if (!dataUrl) return null;
   const parsed = parseDataUrl(dataUrl);
@@ -119,8 +125,7 @@ export async function buildProjectArchive(project: Project): Promise<Blob> {
 
   const shots: ManifestShot[] = project.shots.map((shot, i) => ({
     image: addImage(zip, shot.image, `shot-${i}`),
-    claim: shot.claim,
-    sub: shot.sub,
+    captions: shot.captions,
   }));
 
   const manifest: Manifest = {
@@ -130,6 +135,8 @@ export async function buildProjectArchive(project: Project): Promise<Blob> {
     project: {
       name: project.name,
       presetId: project.presetId,
+      languages: project.languages,
+      defaultLanguage: project.defaultLanguage,
       background: manifestBackground,
       text: project.text,
       device: project.device,
@@ -176,11 +183,55 @@ async function readArchiveImage(
   const entry = zip.file(path);
   if (!entry) return null;
   const base64 = await entry.async("base64");
-  // base64 inflates by 4/3; compare against the binary cap.
   if (base64.length > (MAX_IMAGE_BYTES / 3) * 4) {
     throw new Error("An image in the archive is too large (max 10 MB)");
   }
   return `data:${mime};base64,${base64}`;
+}
+
+/** Validates the language list, deduping codes and enforcing the cap. */
+function normalizeLanguages(raw: unknown): Language[] {
+  if (!Array.isArray(raw)) return [{ ...DEFAULT_LANGUAGE }];
+  const seen = new Set<string>();
+  const out: Language[] = [];
+  for (const item of raw) {
+    if (out.length >= MAX_LANGUAGES) break;
+    if (!item || typeof item !== "object") continue;
+    const code = (item as Record<string, unknown>).code;
+    if (!isValidLangCode(code) || seen.has(code)) continue;
+    const rawLabel = (item as Record<string, unknown>).label;
+    const label =
+      typeof rawLabel === "string" && rawLabel.trim() ? rawLabel : code;
+    seen.add(code);
+    out.push({ code, label });
+  }
+  return out.length ? out : [{ ...DEFAULT_LANGUAGE }];
+}
+
+function cappedString(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, CAPTION_MAX_LENGTH) : "";
+}
+
+/** Builds a shot's captions map, keeping only keys for known languages. */
+function normalizeCaptions(
+  raw: Record<string, unknown>,
+  langCodes: readonly string[],
+): Record<string, Caption> {
+  const out: Record<string, Caption> = {};
+  const rawCaptions = raw.captions;
+  if (rawCaptions && typeof rawCaptions === "object") {
+    for (const code of langCodes) {
+      const c = (rawCaptions as Record<string, unknown>)[code];
+      if (c && typeof c === "object") {
+        const rec = c as Record<string, unknown>;
+        out[code] = {
+          claim: cappedString(rec.claim),
+          sub: cappedString(rec.sub),
+        };
+      }
+    }
+  }
+  return out;
 }
 
 async function normalizeBackground(
@@ -255,22 +306,23 @@ function normalizeDevice(raw: unknown): DeviceStyle {
   };
 }
 
-async function normalizeShot(zip: JSZip, raw: unknown): Promise<Shot> {
+async function normalizeShot(
+  zip: JSZip,
+  raw: unknown,
+  langCodes: readonly string[],
+): Promise<Shot> {
   const s = (raw ?? {}) as Record<string, unknown>;
-  const claim = typeof s.claim === "string" ? s.claim : "";
-  const sub = typeof s.sub === "string" ? s.sub : "";
   return {
     id: createId(),
     image: await readArchiveImage(zip, s.image),
-    claim: claim.slice(0, CAPTION_MAX_LENGTH),
-    sub: sub.slice(0, CAPTION_MAX_LENGTH),
+    captions: normalizeCaptions(s, langCodes),
   };
 }
 
 /**
  * Reads a `.studio` archive (Blob/File) into a validated {@link Project} with
  * fresh ids and timestamps. Throws with a user-facing message when the file is
- * not a valid, current screenshot-studio archive.
+ * not a valid screenshot-studio archive.
  */
 export async function readProjectFile(file: Blob): Promise<Project> {
   if (file.size > MAX_PROJECT_FILE_BYTES) {
@@ -313,13 +365,21 @@ export async function readProjectFile(file: Blob): Promise<Project> {
   }
 
   const raw = (manifest.project ?? {}) as Record<string, unknown>;
+  const languages = normalizeLanguages(raw.languages);
+  const langCodes = languages.map((l) => l.code);
+  const defaultLanguage =
+    typeof raw.defaultLanguage === "string" &&
+    langCodes.includes(raw.defaultLanguage)
+      ? raw.defaultLanguage
+      : langCodes[0];
+
   const rawShots = Array.isArray(raw.shots)
     ? raw.shots.slice(0, MAX_SHOTS_PER_PROJECT)
     : [];
 
   const [background, shots] = await Promise.all([
     normalizeBackground(zip, raw.background),
-    Promise.all(rawShots.map((s) => normalizeShot(zip, s))),
+    Promise.all(rawShots.map((s) => normalizeShot(zip, s, langCodes))),
   ]);
 
   const now = Date.now();
@@ -332,6 +392,8 @@ export async function readProjectFile(file: Blob): Promise<Project> {
     createdAt: now,
     updatedAt: now,
     presetId: isPresetId(raw.presetId) ? raw.presetId : "ios-6-9",
+    languages,
+    defaultLanguage,
     background,
     text: normalizeText(raw.text),
     device: normalizeDevice(raw.device),

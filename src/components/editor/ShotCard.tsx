@@ -4,10 +4,12 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Project } from "@/lib/types";
+import { captionFor } from "@/lib/caption";
 import { exportShot } from "@/lib/export";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import { ShotCanvas } from "./ShotCanvas";
+import { useLanguage } from "./LanguageContext";
 import { Input } from "@/components/ui/input";
 
 /** One screenshot in the grid: live preview, captions and per-shot actions. */
@@ -19,7 +21,9 @@ export function ShotCard({
   index: number;
 }) {
   const shot = project.shots[index];
-  const updateShot = useProjectStore((s) => s.updateShot);
+  const { language } = useLanguage();
+  const caption = captionFor(shot, language);
+  const updateCaption = useProjectStore((s) => s.updateCaption);
   const moveShot = useProjectStore((s) => s.moveShot);
   const removeShot = useProjectStore((s) => s.removeShot);
   const { group } = useUndoGroup();
@@ -31,7 +35,7 @@ export function ShotCard({
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportShot(project, shot, index);
+      await exportShot(project, shot, index, language);
     } catch (error) {
       console.error(error);
       toast.error("Export failed");
@@ -46,25 +50,32 @@ export function ShotCard({
       <ShotCanvas
         project={project}
         shot={shot}
+        language={language}
         className="block h-auto w-full rounded-md bg-black"
       />
       <Input
-        value={shot.claim}
+        value={caption.claim}
         placeholder="Claim / headline"
         aria-label={`Claim for screenshot ${index + 1}`}
         className="font-medium"
         onChange={(e) =>
           group(() =>
-            updateShot(project.id, shot.id, { claim: e.target.value }),
+            updateCaption(project.id, shot.id, language, {
+              claim: e.target.value,
+            }),
           )
         }
       />
       <Input
-        value={shot.sub}
+        value={caption.sub}
         placeholder="Subtext (optional)"
         aria-label={`Subtext for screenshot ${index + 1}`}
         onChange={(e) =>
-          group(() => updateShot(project.id, shot.id, { sub: e.target.value }))
+          group(() =>
+            updateCaption(project.id, shot.id, language, {
+              sub: e.target.value,
+            }),
+          )
         }
       />
       <div className="flex gap-1.5">

@@ -1,4 +1,5 @@
 import type {
+  Caption,
   DeviceStyle,
   GradientBackground,
   Project,
@@ -7,6 +8,7 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_PRESET_ID } from "@/lib/presets";
 import { DEFAULT_FONT } from "@/lib/fonts";
+import { DEFAULT_LANGUAGE } from "@/lib/locales";
 import { createId } from "@/lib/utils";
 
 export const DEFAULT_BACKGROUND: GradientBackground = {
@@ -31,8 +33,13 @@ export const DEFAULT_DEVICE: DeviceStyle = {
   topSpace: 0.26,
 };
 
-export function makeShot(image: string | null): Shot {
-  return { id: createId(), image, claim: "", sub: "" };
+export function makeShot(
+  image: string | null,
+  languages: readonly string[] = [DEFAULT_LANGUAGE.code],
+): Shot {
+  const captions: Record<string, Caption> = {};
+  for (const code of languages) captions[code] = { claim: "", sub: "" };
+  return { id: createId(), image, captions };
 }
 
 export function makeProject(name: string): Project {
@@ -43,6 +50,8 @@ export function makeProject(name: string): Project {
     createdAt: now,
     updatedAt: now,
     presetId: DEFAULT_PRESET_ID,
+    languages: [{ ...DEFAULT_LANGUAGE }],
+    defaultLanguage: DEFAULT_LANGUAGE.code,
     background: { ...DEFAULT_BACKGROUND },
     text: { ...DEFAULT_TEXT },
     device: { ...DEFAULT_DEVICE },

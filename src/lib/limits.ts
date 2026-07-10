@@ -32,6 +32,9 @@ export const CAPTION_MAX_LENGTH = 2000;
 /** Maximum shots kept from a single imported project. */
 export const MAX_SHOTS_PER_PROJECT = 60;
 
+/** Maximum languages a project may maintain. */
+export const MAX_LANGUAGES = 40;
+
 /** Screenshot uploads: allowed types and maximum file size. */
 export const ACCEPTED_IMAGE_TYPES = [
   "image/png",

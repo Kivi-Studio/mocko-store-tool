@@ -80,15 +80,29 @@ export type DeviceStyle = {
   topSpace: number;
 };
 
-/** A single uploaded screenshot with its caption. */
-export type Shot = {
-  id: string;
-  /** The screenshot as a data URL, or null for the empty placeholder. */
-  image: string | null;
+/** A localized caption: the headline and its supporting line. */
+export type Caption = {
   /** Headline shown above the device. */
   claim: string;
   /** Optional supporting line shown under the claim. */
   sub: string;
+};
+
+/** A language a project maintains captions for (e.g. `{ code: "de", … }`). */
+export type Language = {
+  /** BCP-47-ish locale code used for folder/file names (e.g. "en", "pt-BR"). */
+  code: string;
+  /** Human-readable label shown in the UI. */
+  label: string;
+};
+
+/** A single uploaded screenshot with one caption per project language. */
+export type Shot = {
+  id: string;
+  /** The screenshot as a data URL, or null for the empty placeholder. */
+  image: string | null;
+  /** Captions keyed by language code; a missing key means "not translated". */
+  captions: Record<string, Caption>;
 };
 
 /** A collection of shots sharing one styling, exported to one store format. */
@@ -99,6 +113,10 @@ export type Project = {
   updatedAt: number;
   /** Selected export preset (see `@/lib/presets`). */
   presetId: string;
+  /** Languages this project maintains captions for (at least one). */
+  languages: Language[];
+  /** Code of the language shown by default (must be one of `languages`). */
+  defaultLanguage: string;
   background: Background;
   text: TextStyle;
   device: DeviceStyle;

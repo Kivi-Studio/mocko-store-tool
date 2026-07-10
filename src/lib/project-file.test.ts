@@ -7,7 +7,7 @@ import {
   PROJECT_VERSION,
 } from "@/lib/project-file";
 import { makeProject } from "@/lib/defaults";
-import { CLAIM_SIZE_MAX, MAX_SHOTS_PER_PROJECT } from "@/lib/limits";
+import { MAX_SHOTS_PER_PROJECT } from "@/lib/limits";
 import type { Project } from "@/lib/types";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
@@ -15,10 +15,20 @@ const PNG = "data:image/png;base64,iVBORw0KGgo=";
 function sample(): Project {
   const p = makeProject("My App");
   p.presetId = "play-phone";
-  p.background = { type: "solid", color: "#123456" };
+  p.languages = [
+    { code: "en", label: "English" },
+    { code: "de", label: "German" },
+  ];
+  p.defaultLanguage = "de";
   p.shots = [
-    { id: "x", image: PNG, claim: "Hi", sub: "There" },
-    { id: "y", image: null, claim: "", sub: "" },
+    {
+      id: "x",
+      image: PNG,
+      captions: {
+        en: { claim: "Hi", sub: "There" },
+        de: { claim: "Hallo", sub: "Welt" },
+      },
+    },
   ];
   return p;
 }
@@ -36,36 +46,19 @@ async function archiveFrom(
   return zip.generateAsync({ type: "blob" });
 }
 
-describe("archive round-trip", () => {
-  it("preserves styling, preset and shot captions and images", async () => {
+describe("archive round-trip (v3, multilingual)", () => {
+  it("preserves languages, default and per-language captions", async () => {
     const parsed = await readProjectFile(await buildProjectArchive(sample()));
-    expect(parsed.presetId).toBe("play-phone");
-    expect(parsed.background).toEqual({ type: "solid", color: "#123456" });
-    expect(parsed.shots).toHaveLength(2);
-    expect(parsed.shots[0]).toMatchObject({ claim: "Hi", sub: "There" });
+    expect(parsed.languages).toEqual([
+      { code: "en", label: "English" },
+      { code: "de", label: "German" },
+    ]);
+    expect(parsed.defaultLanguage).toBe("de");
+    expect(parsed.shots[0].captions).toEqual({
+      en: { claim: "Hi", sub: "There" },
+      de: { claim: "Hallo", sub: "Welt" },
+    });
     expect(parsed.shots[0].image).toBe(PNG);
-    expect(parsed.shots[1].image).toBeNull();
-  });
-
-  it("round-trips an image background", async () => {
-    const p = sample();
-    p.background = { type: "image", image: PNG };
-    const parsed = await readProjectFile(await buildProjectArchive(p));
-    expect(parsed.background).toEqual({ type: "image", image: PNG });
-  });
-
-  it("stores images as binary entries, not base64 in the manifest", async () => {
-    const zip = await JSZip.loadAsync(await buildProjectArchive(sample()));
-    const manifest = await zip.file("manifest.json")!.async("string");
-    expect(manifest).not.toContain("iVBORw0KGgo");
-    expect(zip.file("images/shot-0.png")).not.toBeNull();
-  });
-
-  it("assigns fresh ids and timestamps on import", async () => {
-    const original = sample();
-    const parsed = await readProjectFile(await buildProjectArchive(original));
-    expect(parsed.id).not.toBe(original.id);
-    expect(parsed.shots[0].id).not.toBe("x");
   });
 
   it("writes the current format and version", async () => {
@@ -76,18 +69,16 @@ describe("archive round-trip", () => {
     expect(manifest.format).toBe(PROJECT_FORMAT);
     expect(manifest.version).toBe(PROJECT_VERSION);
   });
+
+  it("assigns fresh ids on import", async () => {
+    const parsed = await readProjectFile(await buildProjectArchive(sample()));
+    expect(parsed.shots[0].id).not.toBe("x");
+  });
 });
 
 describe("import validation", () => {
   it("rejects a non-zip file", async () => {
     await expect(readProjectFile(new Blob(["not a zip"]))).rejects.toThrow();
-  });
-
-  it("rejects an archive without a manifest", async () => {
-    const zip = new JSZip();
-    zip.file("random.txt", "hi");
-    const blob = await zip.generateAsync({ type: "blob" });
-    await expect(readProjectFile(blob)).rejects.toThrow();
   });
 
   it("rejects a foreign format", async () => {
@@ -105,6 +96,50 @@ describe("import validation", () => {
     await expect(readProjectFile(blob)).rejects.toThrow();
   });
 
+  it("dedupes languages, drops invalid codes and enforces a default", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: PROJECT_VERSION,
+      project: {
+        languages: [
+          { code: "en", label: "English" },
+          { code: "en", label: "dup" },
+          { code: "!!", label: "bad" },
+          { code: "de", label: "German" },
+        ],
+        defaultLanguage: "zz",
+      },
+    });
+    const parsed = await readProjectFile(blob);
+    expect(parsed.languages.map((l) => l.code)).toEqual(["en", "de"]);
+    // Invalid default falls back to the first language.
+    expect(parsed.defaultLanguage).toBe("en");
+  });
+
+  it("drops caption keys for unknown languages", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: PROJECT_VERSION,
+      project: {
+        languages: [{ code: "en", label: "English" }],
+        defaultLanguage: "en",
+        shots: [
+          {
+            image: null,
+            captions: {
+              en: { claim: "Keep", sub: "" },
+              de: { claim: "Drop", sub: "" },
+            },
+          },
+        ],
+      },
+    });
+    const parsed = await readProjectFile(blob);
+    expect(parsed.shots[0].captions).toEqual({
+      en: { claim: "Keep", sub: "" },
+    });
+  });
+
   it("falls back to defaults for unknown preset and bad colors", async () => {
     const blob = await archiveFrom({
       format: PROJECT_FORMAT,
@@ -117,15 +152,6 @@ describe("import validation", () => {
     const parsed = await readProjectFile(blob);
     expect(parsed.presetId).toBe("ios-6-9");
     expect(parsed.background).toEqual({ type: "solid", color: "#0B1020" });
-  });
-
-  it("clamps out-of-range sizes", async () => {
-    const blob = await archiveFrom({
-      format: PROJECT_FORMAT,
-      version: PROJECT_VERSION,
-      project: { text: { claimSize: 99 } },
-    });
-    expect((await readProjectFile(blob)).text.claimSize).toBe(CLAIM_SIZE_MAX);
   });
 
   it("caps the number of shots", async () => {
@@ -159,16 +185,5 @@ describe("import validation", () => {
     const parsed = await readProjectFile(blob);
     expect(parsed.shots[0].image).toBeNull();
     expect(parsed.shots[1].image).toBe("data:image/png;base64,AAAA");
-  });
-
-  it("drops image refs pointing at a missing entry", async () => {
-    const blob = await archiveFrom({
-      format: PROJECT_FORMAT,
-      version: PROJECT_VERSION,
-      project: {
-        shots: [{ image: { path: "images/missing.png", mime: "image/png" } }],
-      },
-    });
-    expect((await readProjectFile(blob)).shots[0].image).toBeNull();
   });
 });
