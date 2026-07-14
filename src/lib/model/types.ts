@@ -1,11 +1,11 @@
 /**
- * Core domain types for the Screenshot Studio.
+ * Core domain types for Mocko.
  *
  * The model is intentionally flat: a Project holds one set of global styling
  * (preset/format, background, text, device) plus an ordered list of shots
- * (uploaded screenshots with a per-shot claim and subtext). Every shot in a
- * project is rendered with the same styling, which keeps a store listing
- * visually consistent and the UI simple.
+ * (uploaded screenshots with a per-shot caption). Every shot shares the same
+ * global styling, which keeps a store listing visually consistent — the only
+ * per-shot overrides are the device's position and (optionally) its size.
  *
  * Sizes that scale with the artboard (font sizes, device width, top space) are
  * stored as fractions (0..1) so they stay resolution-independent between the
@@ -66,6 +66,11 @@ export type TextStyle = {
   claimSize: number;
   /** Subtext size as a fraction of canvas width. */
   subSize: number;
+  /**
+   * Maximum text block width as a fraction of canvas width (the text is
+   * centered within it and wraps to it). 1 = full width, edge to edge.
+   */
+  textWidth: number;
 };
 
 /** Global device-mockup styling shared by every shot. */
@@ -80,29 +85,30 @@ export type DeviceStyle = {
   topSpace: number;
 };
 
-/** A localized caption: the headline and its supporting line. */
-export type Caption = {
-  /** Headline shown above the device. */
-  claim: string;
-  /** Optional supporting line shown under the claim. */
-  sub: string;
-};
-
-/** A language a project maintains captions for (e.g. `{ code: "de", … }`). */
-export type Language = {
-  /** BCP-47-ish locale code used for folder/file names (e.g. "en", "pt-BR"). */
-  code: string;
-  /** Human-readable label shown in the UI. */
-  label: string;
-};
-
-/** A single uploaded screenshot with one caption per project language. */
+/** A single uploaded screenshot with its caption. */
 export type Shot = {
   id: string;
   /** The screenshot as a data URL, or null for the empty placeholder. */
   image: string | null;
-  /** Captions keyed by language code; a missing key means "not translated". */
-  captions: Record<string, Caption>;
+  /** Headline shown above the device. */
+  claim: string;
+  /** Optional supporting line shown under the claim. */
+  sub: string;
+  /**
+   * Horizontal device offset as a fraction of canvas width (-0.5..+0.5);
+   * 0 keeps the device horizontally centered.
+   */
+  offX: number;
+  /**
+   * Vertical device offset as a fraction of canvas height (-0.5..+0.5);
+   * 0 keeps the device centered in its area.
+   */
+  offY: number;
+  /**
+   * Per-shot device width override, as a fraction of canvas width, or `null`
+   * to fall back to the project-global {@link DeviceStyle.scale}.
+   */
+  scale: number | null;
 };
 
 /** A collection of shots sharing one styling, exported to one store format. */
@@ -113,10 +119,6 @@ export type Project = {
   updatedAt: number;
   /** Selected export preset (see `@/lib/presets`). */
   presetId: string;
-  /** Languages this project maintains captions for (at least one). */
-  languages: Language[];
-  /** Code of the language shown by default (must be one of `languages`). */
-  defaultLanguage: string;
   background: Background;
   text: TextStyle;
   device: DeviceStyle;

@@ -9,15 +9,13 @@ import { temporal } from "zundo";
 
 import type {
   Background,
-  Caption,
   DeviceStyle,
-  Language,
   Project,
+  Shot,
   TextStyle,
-} from "@/lib/types";
-import { makeProject, makeShot } from "@/lib/defaults";
-import { emptyCaption } from "@/lib/caption";
-import { createIdbStorage, onExternalWrite } from "@/lib/idb-storage";
+} from "@/lib/model/types";
+import { makeProject, makeShot } from "@/lib/model/defaults";
+import { createIdbStorage, onExternalWrite } from "@/lib/storage/idb-storage";
 import { createId, uniqueName } from "@/lib/utils";
 
 /** Reorder direction: one step towards the front (-1) or the back (1). */
@@ -47,19 +45,30 @@ export type ProjectStore = {
 
   patchSettings: (id: string, patch: SettingsPatch) => void;
   addShots: (id: string, images: string[]) => void;
-  updateCaption: (
+  /** Appends an image-less shot that can be filled in later. */
+  addEmptyShot: (id: string) => void;
+  /** Sets or replaces (or clears, with null) a single shot's image. */
+  setShotImage: (
     projectId: string,
     shotId: string,
-    language: string,
-    patch: Partial<Caption>,
+    image: string | null,
+  ) => void;
+  /** Patches a single shot's caption text (claim / subtext). */
+  updateShotText: (
+    projectId: string,
+    shotId: string,
+    patch: Partial<Pick<Shot, "claim" | "sub">>,
+  ) => void;
+  /** Patches a single shot's device position/size overrides. */
+  updateShotLayout: (
+    projectId: string,
+    shotId: string,
+    patch: Partial<Pick<Shot, "offX" | "offY" | "scale">>,
   ) => void;
   removeShot: (projectId: string, shotId: string) => void;
   moveShot: (projectId: string, shotId: string, dir: MoveDir) => void;
-
-  // Languages
-  addLanguage: (projectId: string, language: Language) => void;
-  removeLanguage: (projectId: string, code: string) => void;
-  setDefaultLanguage: (projectId: string, code: string) => void;
+  /** Moves the shot at `from` to index `to`, shifting the others (drag & drop). */
+  reorderShots: (projectId: string, from: number, to: number) => void;
 };
 
 /** Replaces a project immutably, stamping updatedAt. */
@@ -130,15 +139,10 @@ export const useProjectStore = create<ProjectStore>()(
             name: uniqueName(`${src.name} copy`, taken),
             createdAt: now,
             updatedAt: now,
-            languages: src.languages.map((l) => ({ ...l })),
             background: { ...src.background },
             text: { ...src.text },
             device: { ...src.device },
-            shots: src.shots.map((sh) => ({
-              ...sh,
-              id: createId(),
-              captions: { ...sh.captions },
-            })),
+            shots: src.shots.map((sh) => ({ ...sh, id: createId() })),
           };
           set((s) => {
             const order = [...s.projectOrder];
@@ -167,36 +171,46 @@ export const useProjectStore = create<ProjectStore>()(
 
         addShots: (id, images) =>
           set((s) =>
-            withProject(s, id, (p) => {
-              const codes = p.languages.map((l) => l.code);
-              return {
-                ...p,
-                shots: [
-                  ...p.shots,
-                  ...images.map((img) => makeShot(img, codes)),
-                ],
-              };
-            }),
+            withProject(s, id, (p) => ({
+              ...p,
+              shots: [...p.shots, ...images.map((img) => makeShot(img))],
+            })),
           ),
 
-        updateCaption: (projectId, shotId, language, patch) =>
+        addEmptyShot: (id) =>
+          set((s) =>
+            withProject(s, id, (p) => ({
+              ...p,
+              shots: [...p.shots, makeShot(null)],
+            })),
+          ),
+
+        setShotImage: (projectId, shotId, image) =>
           set((s) =>
             withProject(s, projectId, (p) => ({
               ...p,
               shots: p.shots.map((sh) =>
-                sh.id === shotId
-                  ? {
-                      ...sh,
-                      captions: {
-                        ...sh.captions,
-                        [language]: {
-                          ...emptyCaption(),
-                          ...sh.captions[language],
-                          ...patch,
-                        },
-                      },
-                    }
-                  : sh,
+                sh.id === shotId ? { ...sh, image } : sh,
+              ),
+            })),
+          ),
+
+        updateShotLayout: (projectId, shotId, patch) =>
+          set((s) =>
+            withProject(s, projectId, (p) => ({
+              ...p,
+              shots: p.shots.map((sh) =>
+                sh.id === shotId ? { ...sh, ...patch } : sh,
+              ),
+            })),
+          ),
+
+        updateShotText: (projectId, shotId, patch) =>
+          set((s) =>
+            withProject(s, projectId, (p) => ({
+              ...p,
+              shots: p.shots.map((sh) =>
+                sh.id === shotId ? { ...sh, ...patch } : sh,
               ),
             })),
           ),
@@ -221,50 +235,32 @@ export const useProjectStore = create<ProjectStore>()(
             }),
           ),
 
-        addLanguage: (projectId, language) =>
-          set((s) =>
-            withProject(s, projectId, (p) =>
-              p.languages.some((l) => l.code === language.code)
-                ? p
-                : { ...p, languages: [...p.languages, language] },
-            ),
-          ),
-
-        removeLanguage: (projectId, code) =>
+        reorderShots: (projectId, from, to) =>
           set((s) =>
             withProject(s, projectId, (p) => {
-              // Always keep at least one language.
-              if (p.languages.length <= 1) return p;
-              const languages = p.languages.filter((l) => l.code !== code);
-              if (languages.length === p.languages.length) return p;
-              const defaultLanguage =
-                p.defaultLanguage === code
-                  ? languages[0].code
-                  : p.defaultLanguage;
-              const shots = p.shots.map((sh) => {
-                if (!(code in sh.captions)) return sh;
-                const captions = { ...sh.captions };
-                delete captions[code];
-                return { ...sh, captions };
-              });
-              return { ...p, languages, defaultLanguage, shots };
+              const shots = [...p.shots];
+              if (
+                from === to ||
+                from < 0 ||
+                from >= shots.length ||
+                to < 0 ||
+                to >= shots.length
+              )
+                return p;
+              const [moved] = shots.splice(from, 1);
+              shots.splice(to, 0, moved);
+              return { ...p, shots };
             }),
-          ),
-
-        setDefaultLanguage: (projectId, code) =>
-          set((s) =>
-            withProject(s, projectId, (p) =>
-              p.languages.some((l) => l.code === code)
-                ? { ...p, defaultLanguage: code }
-                : p,
-            ),
           ),
       }),
       {
         name: "screenshot-studio",
-        // Bumped past the pre-multilingual shape; older local state is
-        // discarded rather than migrated.
-        version: 2,
+        // Bumped when the shot/project shape changes (v4 dropped multilingual
+        // captions — Shot now holds a single claim/sub). The app is pre-release,
+        // so older local state is intentionally discarded rather than migrated;
+        // `migrate` returns a clean slate (and silences persist's warning).
+        version: 4,
+        migrate: () => ({ projects: {}, projectOrder: [] }),
         storage: createIdbStorage(),
         partialize: (state) => ({
           projects: state.projects,

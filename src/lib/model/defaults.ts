@@ -1,14 +1,12 @@
 import type {
-  Caption,
   DeviceStyle,
   GradientBackground,
   Project,
   Shot,
   TextStyle,
-} from "@/lib/types";
-import { DEFAULT_PRESET_ID } from "@/lib/presets";
-import { DEFAULT_FONT } from "@/lib/fonts";
-import { DEFAULT_LANGUAGE } from "@/lib/locales";
+} from "@/lib/model/types";
+import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
+import { DEFAULT_FONT } from "@/lib/model/fonts";
 import { createId } from "@/lib/utils";
 
 export const DEFAULT_BACKGROUND: GradientBackground = {
@@ -24,6 +22,8 @@ export const DEFAULT_TEXT: TextStyle = {
   font: DEFAULT_FONT,
   claimSize: 0.055,
   subSize: 0.032,
+  // 0.82 = the previous fixed 9% side padding, preserved as the default.
+  textWidth: 0.82,
 };
 
 export const DEFAULT_DEVICE: DeviceStyle = {
@@ -33,13 +33,16 @@ export const DEFAULT_DEVICE: DeviceStyle = {
   topSpace: 0.26,
 };
 
-export function makeShot(
-  image: string | null,
-  languages: readonly string[] = [DEFAULT_LANGUAGE.code],
-): Shot {
-  const captions: Record<string, Caption> = {};
-  for (const code of languages) captions[code] = { claim: "", sub: "" };
-  return { id: createId(), image, captions };
+export function makeShot(image: string | null): Shot {
+  return {
+    id: createId(),
+    image,
+    claim: "",
+    sub: "",
+    offX: 0,
+    offY: 0,
+    scale: null,
+  };
 }
 
 export function makeProject(name: string): Project {
@@ -50,8 +53,6 @@ export function makeProject(name: string): Project {
     createdAt: now,
     updatedAt: now,
     presetId: DEFAULT_PRESET_ID,
-    languages: [{ ...DEFAULT_LANGUAGE }],
-    defaultLanguage: DEFAULT_LANGUAGE.code,
     background: { ...DEFAULT_BACKGROUND },
     text: { ...DEFAULT_TEXT },
     device: { ...DEFAULT_DEVICE },

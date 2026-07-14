@@ -4,25 +4,33 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Download, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/lib/model/types";
+import { exportProjectZip } from "@/lib/render/export";
 import { useProjectStore, useTemporal } from "@/store/useProjectStore";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { LanguageSwitcher } from "./LanguageSwitcher";
-import { ExportDialog } from "./ExportDialog";
 
 export function EditorTopbar({ project }: { project: Project }) {
   const renameProject = useProjectStore((s) => s.renameProject);
   const { canUndo, canRedo, undo, redo } = useTemporal();
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const handleExportClick = () => {
+  const handleExportClick = async () => {
     if (project.shots.length === 0) {
       toast.error("No screenshots to export yet");
       return;
     }
-    setExportOpen(true);
+    setExporting(true);
+    try {
+      await exportProjectZip(project);
+      toast.success(`Exported ${project.shots.length} screenshot(s)`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -40,8 +48,6 @@ export function EditorTopbar({ project }: { project: Project }) {
         onChange={(e) => renameProject(project.id, e.target.value)}
         className="h-8 w-56 font-medium"
       />
-
-      <LanguageSwitcher project={project} />
 
       <div className="flex-1" />
 
@@ -64,16 +70,10 @@ export function EditorTopbar({ project }: { project: Project }) {
         <Redo2 className="size-4" />
       </Button>
       <Separator orientation="vertical" className="mx-1 h-6" />
-      <Button onClick={handleExportClick}>
+      <Button onClick={() => void handleExportClick()} disabled={exporting}>
         <Download className="size-4" />
-        Export all (ZIP)
+        {exporting ? "Exporting…" : "Export all (ZIP)"}
       </Button>
-
-      <ExportDialog
-        project={project}
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-      />
     </header>
   );
 }

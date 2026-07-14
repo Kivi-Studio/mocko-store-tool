@@ -14,6 +14,10 @@ export const CLAIM_SIZE_MAX = 0.09;
 export const SUB_SIZE_MIN = 0.018;
 export const SUB_SIZE_MAX = 0.06;
 
+/** Maximum text block width, as a fraction of canvas width. */
+export const TEXT_WIDTH_MIN = 0.5;
+export const TEXT_WIDTH_MAX = 0.98;
+
 /** Device width, as a fraction of canvas width. */
 export const DEVICE_SCALE_MIN = 0.5;
 export const DEVICE_SCALE_MAX = 0.95;
@@ -21,6 +25,19 @@ export const DEVICE_SCALE_MAX = 0.95;
 /** Top text-area height, as a fraction of canvas height. */
 export const TOP_SPACE_MIN = 0.14;
 export const TOP_SPACE_MAX = 0.42;
+
+/**
+ * Per-shot device offset, as a fraction of canvas width (offX) or height
+ * (offY). 0 = centered; ±0.5 pushes the device fully to one edge.
+ */
+export const OFFSET_MIN = -0.5;
+export const OFFSET_MAX = 0.5;
+
+/**
+ * How close to an axis (as a fraction of canvas width/height) a drag must come
+ * before it snaps to the center and shows a guide line.
+ */
+export const SNAP_THRESHOLD = 0.015;
 
 /** Gradient angle bounds, in degrees. */
 export const GRADIENT_ANGLE_MIN = 0;
@@ -31,9 +48,6 @@ export const CAPTION_MAX_LENGTH = 2000;
 
 /** Maximum shots kept from a single imported project. */
 export const MAX_SHOTS_PER_PROJECT = 60;
-
-/** Maximum languages a project may maintain. */
-export const MAX_LANGUAGES = 40;
 
 /** Screenshot uploads: allowed types and maximum file size. */
 export const ACCEPTED_IMAGE_TYPES = [

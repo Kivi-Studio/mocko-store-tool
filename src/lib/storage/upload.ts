@@ -1,4 +1,4 @@
-import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/limits";
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/model/limits";
 
 /**
  * Validates and reads an uploaded image `File` into a data URL. Rejects

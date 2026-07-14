@@ -13,10 +13,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Screenshot Studio",
-    template: "%s – Screenshot Studio",
+    default: "Mocko",
+    template: "%s – Mocko",
   },
-  applicationName: "Screenshot Studio",
+  applicationName: "Mocko",
   description:
     "Design App Store & Google Play screenshots — device mockups, backgrounds, captions and PNG/JPEG export.",
 };

@@ -1,0 +1,47 @@
+# Mocko — static export served by Apache (e.g. netcup Webhosting).
+# This file is copied verbatim into out/ on `next build` and must sit in the
+# document root next to index.html.
+
+# --- Security headers (replace the removed next.config headers()) ---
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# --- Correct MIME type for the web manifest ---
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
+# --- Caching ---
+<IfModule mod_headers.c>
+  # Hashed Next.js assets never change under the same name — cache hard.
+  <FilesMatch "\.(js|css|woff2?|png|jpg|jpeg|svg|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  # HTML and the service worker must always be revalidated so updates ship.
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "^sw\.js$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# --- Gzip text assets ---
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml application/manifest+json
+</IfModule>
+
+# --- SPA fallback: unknown paths render the app shell instead of a raw 404 ---
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Leave real files and directories alone (index.html, /project/, /_next/ …).
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  # Everything else falls back to the entry page.
+  RewriteRule ^ /index.html [L]
+</IfModule>

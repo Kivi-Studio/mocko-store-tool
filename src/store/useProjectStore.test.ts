@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore } from "@/store/useProjectStore";
-import { DEFAULT_PRESET_ID } from "@/lib/presets";
+import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
 
 const store = () => useProjectStore.getState();
 const shots = (id: string) => store().projects[id].shots;
@@ -18,8 +18,6 @@ describe("project CRUD", () => {
     const project = store().projects[a];
     expect(project.name).toBe("A");
     expect(project.presetId).toBe(DEFAULT_PRESET_ID);
-    expect(project.languages).toEqual([{ code: "en", label: "English" }]);
-    expect(project.defaultLanguage).toBe("en");
     expect(project.shots).toEqual([]);
   });
 
@@ -29,47 +27,42 @@ describe("project CRUD", () => {
     expect(store().projects[second].name).toBe("Same (2)");
   });
 
-  it("duplicates a project with fresh, independent captions", () => {
+  it("duplicates a project with fresh, independent shots", () => {
     const id = store().createProject("Orig");
     store().addShots(id, ["data:a"]);
     const shotId = shots(id)[0].id;
-    store().updateCaption(id, shotId, "en", { claim: "Hi" });
+    store().updateShotText(id, shotId, { claim: "Hi" });
     const copyId = store().duplicateProject(id)!;
     const copy = store().projects[copyId];
-    expect(copy.shots[0].captions.en.claim).toBe("Hi");
+    expect(copy.shots[0].claim).toBe("Hi");
     // Mutating the copy must not touch the original.
-    store().updateCaption(copyId, copy.shots[0].id, "en", { claim: "X" });
-    expect(shots(id)[0].captions.en.claim).toBe("Hi");
+    store().updateShotText(copyId, copy.shots[0].id, { claim: "X" });
+    expect(shots(id)[0].claim).toBe("Hi");
   });
 });
 
 describe("shots & captions", () => {
-  it("adds shots with an empty caption per project language", () => {
+  it("adds shots with empty caption text", () => {
     const id = store().createProject("P");
-    store().addLanguage(id, { code: "de", label: "German" });
     store().addShots(id, ["data:1"]);
-    expect(shots(id)[0].captions).toEqual({
-      en: { claim: "", sub: "" },
-      de: { claim: "", sub: "" },
-    });
+    expect(shots(id)[0]).toMatchObject({ claim: "", sub: "" });
   });
 
-  it("updates a caption for a single language only", () => {
-    const id = store().createProject("P");
-    store().addLanguage(id, { code: "de", label: "German" });
-    store().addShots(id, ["data:1"]);
-    const shotId = shots(id)[0].id;
-    store().updateCaption(id, shotId, "de", { claim: "Hallo", sub: "Welt" });
-    expect(shots(id)[0].captions.de).toEqual({ claim: "Hallo", sub: "Welt" });
-    expect(shots(id)[0].captions.en).toEqual({ claim: "", sub: "" });
-  });
-
-  it("creates the caption entry when updating a new language key", () => {
+  it("updates a shot's claim and subtext", () => {
     const id = store().createProject("P");
     store().addShots(id, ["data:1"]);
     const shotId = shots(id)[0].id;
-    store().updateCaption(id, shotId, "fr", { claim: "Bonjour" });
-    expect(shots(id)[0].captions.fr).toEqual({ claim: "Bonjour", sub: "" });
+    store().updateShotText(id, shotId, { claim: "Hello", sub: "World" });
+    expect(shots(id)[0]).toMatchObject({ claim: "Hello", sub: "World" });
+  });
+
+  it("updates only the addressed shot's text", () => {
+    const id = store().createProject("P");
+    store().addShots(id, ["a", "b"]);
+    const first = shots(id)[0].id;
+    store().updateShotText(id, first, { claim: "Only me" });
+    expect(shots(id)[0].claim).toBe("Only me");
+    expect(shots(id)[1].claim).toBe("");
   });
 
   it("moves a shot within the list", () => {
@@ -79,43 +72,64 @@ describe("shots & captions", () => {
     store().moveShot(id, second.id, -1);
     expect(shots(id).map((s) => s.image)).toEqual(["b", "a", "c"]);
   });
-});
 
-describe("languages", () => {
-  it("adds a language and ignores duplicates", () => {
+  it("reorders a shot from one index to another", () => {
     const id = store().createProject("P");
-    store().addLanguage(id, { code: "de", label: "German" });
-    store().addLanguage(id, { code: "de", label: "German (dup)" });
-    expect(store().projects[id].languages.map((l) => l.code)).toEqual([
-      "en",
-      "de",
-    ]);
+    store().addShots(id, ["a", "b", "c", "d"]);
+    // Move the first shot to the third slot.
+    store().reorderShots(id, 0, 2);
+    expect(shots(id).map((s) => s.image)).toEqual(["b", "c", "a", "d"]);
+    // Move it back towards the front.
+    store().reorderShots(id, 2, 1);
+    expect(shots(id).map((s) => s.image)).toEqual(["b", "a", "c", "d"]);
   });
 
-  it("removes a language and its captions, keeping at least one", () => {
+  it("ignores out-of-range or no-op reorders", () => {
     const id = store().createProject("P");
-    store().addLanguage(id, { code: "de", label: "German" });
-    store().addShots(id, ["data:1"]);
-    store().removeLanguage(id, "de");
-    expect(store().projects[id].languages.map((l) => l.code)).toEqual(["en"]);
-    expect(shots(id)[0].captions.de).toBeUndefined();
-    // Removing the last remaining language is a no-op.
-    store().removeLanguage(id, "en");
-    expect(store().projects[id].languages).toHaveLength(1);
+    store().addShots(id, ["a", "b"]);
+    store().reorderShots(id, 0, 0);
+    store().reorderShots(id, 0, 5);
+    store().reorderShots(id, -1, 1);
+    expect(shots(id).map((s) => s.image)).toEqual(["a", "b"]);
   });
 
-  it("reassigns the default when the default language is removed", () => {
+  it("adds an empty shot with centered/global layout defaults", () => {
     const id = store().createProject("P");
-    store().addLanguage(id, { code: "de", label: "German" });
-    store().setDefaultLanguage(id, "de");
-    store().removeLanguage(id, "de");
-    expect(store().projects[id].defaultLanguage).toBe("en");
+    store().addEmptyShot(id);
+    const shot = shots(id)[0];
+    expect(shot.image).toBeNull();
+    expect(shot).toMatchObject({ offX: 0, offY: 0, scale: null });
   });
 
-  it("only accepts a default that exists", () => {
+  it("sets and replaces a shot's image", () => {
     const id = store().createProject("P");
-    store().setDefaultLanguage(id, "zz");
-    expect(store().projects[id].defaultLanguage).toBe("en");
+    store().addEmptyShot(id);
+    const shotId = shots(id)[0].id;
+    store().setShotImage(id, shotId, "data:new");
+    expect(shots(id)[0].image).toBe("data:new");
+    store().setShotImage(id, shotId, null);
+    expect(shots(id)[0].image).toBeNull();
+  });
+
+  it("patches only the addressed shot's layout", () => {
+    const id = store().createProject("P");
+    store().addShots(id, ["a", "b"]);
+    const first = shots(id)[0].id;
+    store().updateShotLayout(id, first, { offX: 0.25, scale: 0.7 });
+    expect(shots(id)[0]).toMatchObject({ offX: 0.25, offY: 0, scale: 0.7 });
+    // The sibling is untouched.
+    expect(shots(id)[1]).toMatchObject({ offX: 0, offY: 0, scale: null });
+  });
+
+  it("undoes a layout change", () => {
+    const id = store().createProject("P");
+    store().addShots(id, ["a"]);
+    const shotId = shots(id)[0].id;
+    useProjectStore.temporal.getState().clear();
+    store().updateShotLayout(id, shotId, { offX: 0.3 });
+    expect(shots(id)[0].offX).toBe(0.3);
+    useProjectStore.temporal.getState().undo();
+    expect(shots(id)[0].offX).toBe(0);
   });
 });
 

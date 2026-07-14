@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { HexColorPicker } from "react-colorful";
-import { isHexColor } from "@/lib/color";
+import { isHexColor } from "@/lib/model/color";
 import { cn } from "@/lib/utils";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import {
@@ -90,6 +90,7 @@ export function LabeledSlider({
   step = 1,
   onChange,
   format,
+  disabled = false,
 }: {
   label: string;
   value: number;
@@ -98,6 +99,7 @@ export function LabeledSlider({
   step?: number;
   onChange: (value: number) => void;
   format?: (value: number) => string;
+  disabled?: boolean;
 }) {
   const { group, end } = useUndoGroup();
   return (
@@ -113,6 +115,7 @@ export function LabeledSlider({
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
         aria-label={label}
         onValueChange={(v) =>
           group(() => onChange(Array.isArray(v) ? v[0] : v))

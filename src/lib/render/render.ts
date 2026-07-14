@@ -4,7 +4,7 @@ import type {
   DeviceStyle,
   Preset,
   TextStyle,
-} from "@/lib/types";
+} from "@/lib/model/types";
 
 /**
  * Canvas rendering for a single store image.
@@ -15,13 +15,43 @@ import type {
  * images must be decoded beforehand and passed in.
  */
 
-/** Screen aspect ratio (height / width) per device, in portrait. */
+/**
+ * Nominal screen aspect ratio (height / width) per device, in portrait. Used as
+ * the placeholder aspect when no screenshot is present; with a screenshot the
+ * frame adapts to the image (see {@link screenAspectFor}).
+ */
 const SCREEN_ASPECT: Record<Exclude<DeviceKind, "none">, number> = {
   iphone: 19.5 / 9,
   ipad: 4 / 3,
-  "android-phone": 16 / 9,
+  "android-phone": 20 / 9,
   "android-tablet": 16 / 10,
 };
+
+/**
+ * Believable aspect range [min, max] per device. The frame matches the uploaded
+ * screenshot's aspect so it fills without cropping, but only within these bounds
+ * so an oddly-shaped image can't warp the frame into something un-phone-like.
+ */
+const ASPECT_RANGE: Record<Exclude<DeviceKind, "none">, [number, number]> = {
+  iphone: [1.9, 2.23],
+  ipad: [1.25, 1.45],
+  "android-phone": [1.7, 2.34],
+  "android-tablet": [1.4, 1.7],
+};
+
+/**
+ * The screen aspect to draw for a device: matched to the uploaded screenshot so
+ * it fills the frame without cropping, clamped to {@link ASPECT_RANGE}. Falls
+ * back to the device's nominal aspect when there is no image.
+ */
+export function screenAspectFor(
+  kind: Exclude<DeviceKind, "none">,
+  img: { width: number; height: number } | null,
+): number {
+  if (!img || img.width <= 0 || img.height <= 0) return SCREEN_ASPECT[kind];
+  const [min, max] = ASPECT_RANGE[kind];
+  return Math.min(max, Math.max(min, img.height / img.width));
+}
 
 /** Bezel thickness as a fraction of device width, per device. */
 const BEZEL_RATIO: Record<Exclude<DeviceKind, "none">, number> = {
@@ -140,7 +170,13 @@ function paintText(
   claim: string,
   sub: string,
 ): number {
-  const pad = W * 0.09;
+  // Text block width as a fraction of the canvas; the block is centered, so the
+  // side padding is half the leftover. Fall back to 0.82 (the former fixed 9%
+  // padding) for projects saved before this setting existed.
+  const textWidth =
+    text.textWidth && text.textWidth > 0 ? text.textWidth : 0.82;
+  const maxTextW = W * textWidth;
+  const pad = (W - maxTextW) / 2;
   // Frameless formats center the text over the whole canvas.
   const frameless = deviceKind === "none";
   const topH = frameless ? H : H * device.topSpace;
@@ -153,7 +189,6 @@ function paintText(
 
   const claimPx = W * text.claimSize;
   const subPx = W * text.subSize;
-  const maxTextW = W - pad * 2;
 
   ctx.font = `700 ${claimPx}px ${text.font}`;
   const claimLines = wrapText(ctx, claim, maxTextW);
@@ -188,18 +223,46 @@ function paintText(
   return topH;
 }
 
-function paintDevice(
-  ctx: CanvasRenderingContext2D,
+/** The placed geometry of a device mockup, in canvas pixels. */
+export type DeviceRect = {
+  /** Frame top-left. */
+  dx: number;
+  dy: number;
+  deviceW: number;
+  deviceH: number;
+  bezel: number;
+  /** Frame outer corner radius. */
+  outerR: number;
+  /** Screen (inner) corner radius. */
+  screenR: number;
+  /** Screen top-left. */
+  sx: number;
+  sy: number;
+  screenW: number;
+  screenH: number;
+};
+
+/**
+ * Computes where a device mockup lands, given its area, size and per-shot
+ * offsets. Shared by the real render and the layout-preset preview tiles so a
+ * tile is a pixel-faithful preview of the export.
+ *
+ * `scale`, `offX` and `offY` are fractions of `W`/`H`; `offX`/`offY` shift the
+ * centered device (0 = centered). The device height is capped to `areaH`
+ * (with a small bleed), shrinking width to keep the aspect ratio.
+ */
+export function computeDeviceRect(
   W: number,
   H: number,
   areaTop: number,
   areaH: number,
-  img: HTMLImageElement | null,
-  device: DeviceStyle,
   kind: Exclude<DeviceKind, "none">,
-): void {
-  const screenAspect = SCREEN_ASPECT[kind];
-  const maxDeviceW = W * device.scale;
+  scale: number,
+  offX: number,
+  offY: number,
+  screenAspect: number = SCREEN_ASPECT[kind],
+): DeviceRect {
+  const maxDeviceW = W * scale;
   const bezel = maxDeviceW * BEZEL_RATIO[kind];
 
   let deviceW = maxDeviceW;
@@ -216,10 +279,63 @@ function paintDevice(
     deviceW = screenW + 2 * bezel;
   }
 
-  const dx = (W - deviceW) / 2;
-  const dy = areaTop + (areaH - deviceH) / 2;
+  const dx = (W - deviceW) / 2 + offX * W;
+  const dy = areaTop + (areaH - deviceH) / 2 + offY * H;
   const outerR = deviceW * OUTER_RADIUS_RATIO[kind];
   const screenR = Math.max(outerR - bezel, 4);
+  const sx = dx + bezel;
+  const sy = dy + bezel;
+
+  return {
+    dx,
+    dy,
+    deviceW,
+    deviceH,
+    bezel,
+    outerR,
+    screenR,
+    sx,
+    sy,
+    screenW,
+    screenH,
+  };
+}
+
+function paintDevice(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  areaTop: number,
+  areaH: number,
+  img: HTMLImageElement | null,
+  device: DeviceStyle,
+  kind: Exclude<DeviceKind, "none">,
+  scale: number,
+  offX: number,
+  offY: number,
+): void {
+  const {
+    dx,
+    dy,
+    deviceW,
+    deviceH,
+    outerR,
+    screenR,
+    sx,
+    sy,
+    screenW,
+    screenH,
+  } = computeDeviceRect(
+    W,
+    H,
+    areaTop,
+    areaH,
+    kind,
+    scale,
+    offX,
+    offY,
+    screenAspectFor(kind, img),
+  );
 
   // Frame body with a soft drop shadow.
   ctx.save();
@@ -242,8 +358,6 @@ function paintDevice(
   }
 
   // Screen: clip to the rounded screen and draw the screenshot (cover).
-  const sx = dx + bezel;
-  const sy = dy + bezel;
   ctx.save();
   roundRect(ctx, sx, sy, screenW, screenH, screenR);
   ctx.clip();
@@ -283,6 +397,15 @@ export type RenderInput = {
   screenshot: HTMLImageElement | null;
   /** Decoded background image (only used when the background is an image). */
   backgroundImage: HTMLImageElement | null;
+  /** Per-shot horizontal device offset (fraction of width); defaults to 0. */
+  offX?: number;
+  /** Per-shot vertical device offset (fraction of height); defaults to 0. */
+  offY?: number;
+  /**
+   * Per-shot device size override (fraction of width). `null`/`undefined`
+   * falls back to the global `device.scale`.
+   */
+  scale?: number | null;
 };
 
 /**
@@ -313,6 +436,7 @@ export function drawShot(canvas: HTMLCanvasElement, input: RenderInput): void {
   );
 
   if (preset.device !== "none") {
+    const scale = input.scale ?? input.device.scale;
     paintDevice(
       ctx,
       W,
@@ -322,6 +446,9 @@ export function drawShot(canvas: HTMLCanvasElement, input: RenderInput): void {
       input.screenshot,
       input.device,
       preset.device,
+      scale,
+      input.offX ?? 0,
+      input.offY ?? 0,
     );
   }
 }

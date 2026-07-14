@@ -4,8 +4,8 @@ import {
   DEFAULT_PRESET_ID,
   getPreset,
   isPresetId,
-} from "@/lib/presets";
-import { FONT_OPTIONS, DEFAULT_FONT, safeFont } from "@/lib/fonts";
+} from "@/lib/model/presets";
+import { FONT_OPTIONS, DEFAULT_FONT, safeFont } from "@/lib/model/fonts";
 
 describe("presets", () => {
   it("has a unique id for every preset", () => {

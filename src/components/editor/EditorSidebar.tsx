@@ -3,10 +3,10 @@
 import { useRef } from "react";
 import { ImagePlus, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
-import type { Background, DeviceStyle, Project, TextStyle } from "@/lib/types";
-import { PRESETS, getPreset } from "@/lib/presets";
-import { FONT_OPTIONS } from "@/lib/fonts";
-import { ACCEPTED_IMAGE_TYPES } from "@/lib/limits";
+import type { Background, DeviceStyle, Project, TextStyle } from "@/lib/model/types";
+import { PRESETS, getPreset } from "@/lib/model/presets";
+import { FONT_OPTIONS } from "@/lib/model/fonts";
+import { ACCEPTED_IMAGE_TYPES } from "@/lib/model/limits";
 import {
   CLAIM_SIZE_MAX,
   CLAIM_SIZE_MIN,
@@ -14,11 +14,14 @@ import {
   DEVICE_SCALE_MIN,
   SUB_SIZE_MAX,
   SUB_SIZE_MIN,
+  TEXT_WIDTH_MAX,
+  TEXT_WIDTH_MIN,
   TOP_SPACE_MAX,
   TOP_SPACE_MIN,
-} from "@/lib/limits";
-import { fileToDataUrl } from "@/lib/upload";
-import { exportProjectFile, readProjectFile } from "@/lib/project-file";
+} from "@/lib/model/limits";
+import { fileToDataUrl } from "@/lib/storage/upload";
+import { exportProjectFile, readProjectFile } from "@/lib/storage/project-file";
+import { APP_VERSION } from "@/lib/version";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useAddShots } from "./useAddShots";
 import {
@@ -59,6 +62,10 @@ export function EditorSidebar({ project }: { project: Project }) {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const preset = getPreset(project.presetId);
+  // Text sizes are stored as a fraction of canvas width but shown as the pixels
+  // they resolve to in the chosen export format — a familiar, concrete unit
+  // that matches the pixels in the exported file exactly.
+  const px = (v: number) => `${Math.round(preset.w * v)} px`;
 
   const setBackground = (bg: Background) =>
     patchSettings(project.id, { background: bg });
@@ -95,7 +102,7 @@ export function EditorSidebar({ project }: { project: Project }) {
       const imported = await readProjectFile(file);
       const id = addProject(imported);
       toast.success("Project imported");
-      window.location.assign(`/project/${id}`);
+      window.location.assign(`/project/?id=${id}`);
     } catch (error) {
       console.error(error);
       toast.error(
@@ -275,7 +282,7 @@ export function EditorSidebar({ project }: { project: Project }) {
           max={CLAIM_SIZE_MAX}
           step={0.001}
           onChange={(claimSize) => setText({ claimSize })}
-          format={pct}
+          format={px}
         />
         <LabeledSlider
           label="Subtext size"
@@ -284,7 +291,7 @@ export function EditorSidebar({ project }: { project: Project }) {
           max={SUB_SIZE_MAX}
           step={0.001}
           onChange={(subSize) => setText({ subSize })}
-          format={pct}
+          format={px}
         />
       </PanelSection>
 
@@ -329,6 +336,15 @@ export function EditorSidebar({ project }: { project: Project }) {
           max={TOP_SPACE_MAX}
           step={0.01}
           onChange={(topSpace) => setDevice({ topSpace })}
+          format={pct}
+        />
+        <LabeledSlider
+          label="Text width"
+          value={project.text.textWidth}
+          min={TEXT_WIDTH_MIN}
+          max={TEXT_WIDTH_MAX}
+          step={0.01}
+          onChange={(textWidth) => setText({ textWidth })}
           format={pct}
         />
       </PanelSection>
@@ -390,6 +406,18 @@ export function EditorSidebar({ project }: { project: Project }) {
           file.
         </p>
       </PanelSection>
+
+      <p className="text-muted-foreground pt-2 text-center text-xs">
+        Mocko v{APP_VERSION} · Powered by{" "}
+        <a
+          href="https://www.kivistudio.de"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-foreground font-medium underline underline-offset-2"
+        >
+          Kivi Studio
+        </a>
+      </p>
     </aside>
   );
 }

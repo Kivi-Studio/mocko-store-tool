@@ -9,8 +9,24 @@ import { useEffect } from "react";
  */
 export function ServiceWorkerRegistration() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
+
+    // In dev, a service worker left over from a production build keeps serving
+    // its cached (stale) bundle — old JS runs even after the dev server
+    // rebuilds. So actively unregister any worker and drop its caches instead
+    // of merely skipping registration.
+    if (process.env.NODE_ENV !== "production") {
+      void navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((reg) => void reg.unregister());
+      });
+      if (typeof caches !== "undefined") {
+        void caches.keys().then((keys) => {
+          keys.forEach((key) => void caches.delete(key));
+        });
+      }
+      return;
+    }
+
     navigator.serviceWorker.register("/sw.js").catch((error) => {
       console.error("Service worker registration failed", error);
     });

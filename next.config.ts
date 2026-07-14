@@ -1,47 +1,27 @@
+import { readFileSync } from "node:fs";
 import type { NextConfig } from "next";
 
-const isDev = process.env.NODE_ENV === "development";
+// Single source of truth for the app version: package.json. Exposed to the
+// client bundle (inlined at build time) so the UI can display it.
+const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
+  version: string;
+};
 
 /**
- * The app makes no network calls of its own (everything is local), so the
- * policy can be strict. 'unsafe-inline'/'unsafe-eval' concessions: Next.js
- * bootstraps with inline scripts (nonce-based CSP would require dynamic
- * rendering via a proxy), inline styles drive the canvas, and dev mode needs
- * eval for fast refresh.
+ * The app is a fully client-side tool (IndexedDB, no backend), so it ships as a
+ * static export (`out/`) that any static host can serve — e.g. netcup shared
+ * hosting via FTP.
+ *
+ * Note: `output: "export"` cannot send HTTP headers, so the security headers
+ * that used to live in `headers()` here are served by the web server instead —
+ * see `public/.htaccess` (Apache), which is copied into `out/` on build.
  */
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "worker-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
-
 const nextConfig: NextConfig = {
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "Content-Security-Policy", value: csp },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-        ],
-      },
-    ];
+  output: "export",
+  trailingSlash: true,
+  images: { unoptimized: true },
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
   },
 };
 

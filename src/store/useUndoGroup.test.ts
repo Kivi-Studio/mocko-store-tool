@@ -26,18 +26,18 @@ describe("useUndoGroup", () => {
     act(() => {
       for (const claim of ["a", "ab", "abc"]) {
         result.current.group(() =>
-          store().updateCaption(projectId, shotId, "en", { claim }),
+          store().updateShotText(projectId, shotId, { claim }),
         );
       }
       result.current.end();
     });
 
-    expect(store().projects[projectId].shots[0].captions.en.claim).toBe("abc");
+    expect(store().projects[projectId].shots[0].claim).toBe("abc");
     expect(useProjectStore.temporal.getState().pastStates.length).toBe(
       before + 1,
     );
     undo();
-    expect(store().projects[projectId].shots[0].captions.en.claim).toBe("");
+    expect(store().projects[projectId].shots[0].claim).toBe("");
   });
 
   it("resumes tracking on unmount mid-burst", () => {
@@ -46,14 +46,14 @@ describe("useUndoGroup", () => {
 
     act(() => {
       result.current.group(() =>
-        store().updateCaption(projectId, shotId, "en", { claim: "x" }),
+        store().updateShotText(projectId, shotId, { claim: "x" }),
       );
     });
     unmount();
 
     // After unmount the next change must be tracked again.
     const before = useProjectStore.temporal.getState().pastStates.length;
-    store().updateCaption(projectId, shotId, "en", { claim: "y" });
+    store().updateShotText(projectId, shotId, { claim: "y" });
     expect(useProjectStore.temporal.getState().pastStates.length).toBe(
       before + 1,
     );

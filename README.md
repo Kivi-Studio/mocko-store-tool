@@ -1,4 +1,4 @@
-# Screenshot Creator
+# Mocko
 
 Ein Tool zum Erstellen von **App Store & Google Play Store Screenshots** — mit
 Device-Frames (iPhone, iPad, Pixel), Hintergründen (Solid/Gradient),

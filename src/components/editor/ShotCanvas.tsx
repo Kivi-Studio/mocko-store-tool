@@ -1,34 +1,30 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Project, Shot } from "@/lib/types";
-import { getPreset } from "@/lib/presets";
-import { drawShot } from "@/lib/render";
-import { loadImageOrNull } from "@/lib/image";
-import { captionFor } from "@/lib/caption";
+import type { Project, Shot } from "@/lib/model/types";
+import { getPreset } from "@/lib/model/presets";
+import { drawShot } from "@/lib/render/render";
+import { loadImageOrNull } from "@/lib/render/image";
 
 /**
  * Renders one shot to a full-resolution canvas that is scaled down with CSS.
  * Images are decoded asynchronously (and cached), then drawn synchronously —
- * so the preview pixels match the export exactly. The `language` selects which
- * caption is drawn.
+ * so the preview pixels match the export exactly.
  */
 export function ShotCanvas({
   project,
   shot,
-  language,
   className,
 }: {
   project: Project;
   shot: Shot;
-  language: string;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const preset = getPreset(project.presetId);
   const { background, text, device } = project;
   const bgImage = background.type === "image" ? background.image : null;
-  const { claim, sub } = captionFor(shot, language);
+  const { claim, sub } = shot;
 
   useEffect(() => {
     let cancelled = false;
@@ -47,12 +43,27 @@ export function ShotCanvas({
         sub,
         screenshot,
         backgroundImage,
+        offX: shot.offX,
+        offY: shot.offY,
+        scale: shot.scale,
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [preset, background, text, device, bgImage, shot.image, claim, sub]);
+  }, [
+    preset,
+    background,
+    text,
+    device,
+    bgImage,
+    shot.image,
+    claim,
+    sub,
+    shot.offX,
+    shot.offY,
+    shot.scale,
+  ]);
 
   return <canvas ref={canvasRef} className={className} />;
 }

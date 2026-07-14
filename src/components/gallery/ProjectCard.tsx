@@ -14,10 +14,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Project } from "@/lib/types";
-import { getPreset } from "@/lib/presets";
-import { exportProjectZip } from "@/lib/export";
-import { exportProjectFile } from "@/lib/project-file";
+import type { Project } from "@/lib/model/types";
+import { getPreset } from "@/lib/model/presets";
+import { exportProjectZip } from "@/lib/render/export";
+import { exportProjectFile } from "@/lib/storage/project-file";
 import { useProjectStore } from "@/store/useProjectStore";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -50,10 +50,7 @@ export function ProjectCard({ project }: { project: Project }) {
       return;
     }
     try {
-      await exportProjectZip(
-        project,
-        project.languages.map((l) => l.code),
-      );
+      await exportProjectZip(project);
       toast.success(`Exported ${count} screenshot(s) as ZIP`);
     } catch (error) {
       console.error(error);
@@ -73,7 +70,7 @@ export function ProjectCard({ project }: { project: Project }) {
   return (
     <div className="group bg-card overflow-hidden rounded-xl border transition-shadow hover:shadow-md">
       <Link
-        href={`/project/${project.id}`}
+        href={`/project/?id=${project.id}`}
         className="bg-muted/40 flex h-[260px] items-center justify-center overflow-hidden p-4"
         aria-label={`Open ${project.name}`}
       >
@@ -81,7 +78,6 @@ export function ProjectCard({ project }: { project: Project }) {
           <ShotCanvas
             project={project}
             shot={cover}
-            language={project.defaultLanguage}
             className="h-auto max-h-full w-auto max-w-full rounded shadow-sm"
           />
         ) : (
@@ -112,7 +108,7 @@ export function ProjectCard({ project }: { project: Project }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => router.push(`/project/${project.id}`)}
+              onClick={() => router.push(`/project/?id=${project.id}`)}
             >
               <FolderOpen className="size-4" />
               Open
@@ -124,7 +120,7 @@ export function ProjectCard({ project }: { project: Project }) {
             <DropdownMenuItem
               onClick={() => {
                 const id = duplicateProject(project.id);
-                if (id) router.push(`/project/${id}`);
+                if (id) router.push(`/project/?id=${id}`);
               }}
             >
               <Copy className="size-4" />

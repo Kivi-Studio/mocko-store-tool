@@ -1,4 +1,4 @@
-import type { Preset } from "@/lib/types";
+import type { Preset } from "@/lib/model/types";
 
 /**
  * Export targets for the App Store and Google Play.

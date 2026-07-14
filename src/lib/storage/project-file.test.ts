@@ -5,29 +5,25 @@ import {
   readProjectFile,
   PROJECT_FORMAT,
   PROJECT_VERSION,
-} from "@/lib/project-file";
-import { makeProject } from "@/lib/defaults";
-import { MAX_SHOTS_PER_PROJECT } from "@/lib/limits";
-import type { Project } from "@/lib/types";
+} from "@/lib/storage/project-file";
+import { makeProject } from "@/lib/model/defaults";
+import { MAX_SHOTS_PER_PROJECT } from "@/lib/model/limits";
+import type { Project } from "@/lib/model/types";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
 function sample(): Project {
   const p = makeProject("My App");
   p.presetId = "play-phone";
-  p.languages = [
-    { code: "en", label: "English" },
-    { code: "de", label: "German" },
-  ];
-  p.defaultLanguage = "de";
   p.shots = [
     {
       id: "x",
       image: PNG,
-      captions: {
-        en: { claim: "Hi", sub: "There" },
-        de: { claim: "Hallo", sub: "Welt" },
-      },
+      claim: "Hi",
+      sub: "There",
+      offX: 0.1,
+      offY: -0.2,
+      scale: 0.8,
     },
   ];
   return p;
@@ -46,19 +42,19 @@ async function archiveFrom(
   return zip.generateAsync({ type: "blob" });
 }
 
-describe("archive round-trip (v3, multilingual)", () => {
-  it("preserves languages, default and per-language captions", async () => {
+describe("archive round-trip", () => {
+  it("preserves the shot's caption text and image", async () => {
     const parsed = await readProjectFile(await buildProjectArchive(sample()));
-    expect(parsed.languages).toEqual([
-      { code: "en", label: "English" },
-      { code: "de", label: "German" },
-    ]);
-    expect(parsed.defaultLanguage).toBe("de");
-    expect(parsed.shots[0].captions).toEqual({
-      en: { claim: "Hi", sub: "There" },
-      de: { claim: "Hallo", sub: "Welt" },
-    });
+    expect(parsed.shots[0].claim).toBe("Hi");
+    expect(parsed.shots[0].sub).toBe("There");
     expect(parsed.shots[0].image).toBe(PNG);
+  });
+
+  it("preserves per-shot device offset and size", async () => {
+    const parsed = await readProjectFile(await buildProjectArchive(sample()));
+    expect(parsed.shots[0].offX).toBe(0.1);
+    expect(parsed.shots[0].offY).toBe(-0.2);
+    expect(parsed.shots[0].scale).toBe(0.8);
   });
 
   it("writes the current format and version", async () => {
@@ -96,48 +92,17 @@ describe("import validation", () => {
     await expect(readProjectFile(blob)).rejects.toThrow();
   });
 
-  it("dedupes languages, drops invalid codes and enforces a default", async () => {
+  it("reads caption text and drops non-string values", async () => {
     const blob = await archiveFrom({
       format: PROJECT_FORMAT,
       version: PROJECT_VERSION,
       project: {
-        languages: [
-          { code: "en", label: "English" },
-          { code: "en", label: "dup" },
-          { code: "!!", label: "bad" },
-          { code: "de", label: "German" },
-        ],
-        defaultLanguage: "zz",
+        shots: [{ image: null, claim: "Keep", sub: 42 }, { image: null }],
       },
     });
     const parsed = await readProjectFile(blob);
-    expect(parsed.languages.map((l) => l.code)).toEqual(["en", "de"]);
-    // Invalid default falls back to the first language.
-    expect(parsed.defaultLanguage).toBe("en");
-  });
-
-  it("drops caption keys for unknown languages", async () => {
-    const blob = await archiveFrom({
-      format: PROJECT_FORMAT,
-      version: PROJECT_VERSION,
-      project: {
-        languages: [{ code: "en", label: "English" }],
-        defaultLanguage: "en",
-        shots: [
-          {
-            image: null,
-            captions: {
-              en: { claim: "Keep", sub: "" },
-              de: { claim: "Drop", sub: "" },
-            },
-          },
-        ],
-      },
-    });
-    const parsed = await readProjectFile(blob);
-    expect(parsed.shots[0].captions).toEqual({
-      en: { claim: "Keep", sub: "" },
-    });
+    expect(parsed.shots[0]).toMatchObject({ claim: "Keep", sub: "" });
+    expect(parsed.shots[1]).toMatchObject({ claim: "", sub: "" });
   });
 
   it("falls back to defaults for unknown preset and bad colors", async () => {
@@ -166,6 +131,38 @@ describe("import validation", () => {
     expect((await readProjectFile(blob)).shots).toHaveLength(
       MAX_SHOTS_PER_PROJECT,
     );
+  });
+
+  it("clamps out-of-range offsets and defaults a bad scale to null", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: PROJECT_VERSION,
+      project: {
+        shots: [
+          { image: null, offX: 5, offY: -9, scale: "big" },
+          { image: null, offX: 0.2, offY: 0.3, scale: 0.3 },
+        ],
+      },
+    });
+    const parsed = await readProjectFile(blob);
+    // Offsets clamp into [-0.5, 0.5]; a non-numeric scale becomes null (global).
+    expect(parsed.shots[0].offX).toBe(0.5);
+    expect(parsed.shots[0].offY).toBe(-0.5);
+    expect(parsed.shots[0].scale).toBeNull();
+    // A too-small scale clamps up to the device-size minimum (0.5).
+    expect(parsed.shots[1].scale).toBe(0.5);
+  });
+
+  it("defaults missing layout fields (older files) to centered/global", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: PROJECT_VERSION,
+      project: { shots: [{ image: null }] },
+    });
+    const parsed = await readProjectFile(blob);
+    expect(parsed.shots[0].offX).toBe(0);
+    expect(parsed.shots[0].offY).toBe(0);
+    expect(parsed.shots[0].scale).toBeNull();
   });
 
   it("drops image refs with a disallowed mime type", async () => {

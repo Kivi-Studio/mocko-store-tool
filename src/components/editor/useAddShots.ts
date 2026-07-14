@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { filesToDataUrls } from "@/lib/upload";
+import { filesToDataUrls } from "@/lib/storage/upload";
 import { useProjectStore } from "@/store/useProjectStore";
 
 /**
