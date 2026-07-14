@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import type {
   Background,
   DeviceStyle,
+  Folder,
   Project,
   Shot,
   TextAlign,
@@ -15,6 +16,7 @@ import {
   DEFAULT_BACKGROUND,
   DEFAULT_DEVICE,
   DEFAULT_TEXT,
+  makeFolder,
 } from "@/lib/model/defaults";
 import { clamp, createId, finiteOr, slugify } from "@/lib/utils";
 import {
@@ -26,9 +28,11 @@ import {
   DEVICE_SCALE_MIN,
   GRADIENT_ANGLE_MAX,
   GRADIENT_ANGLE_MIN,
+  MAX_FOLDERS_PER_WORKSPACE,
   MAX_IMAGE_BYTES,
   MAX_MANIFEST_CHARS,
   MAX_PROJECT_FILE_BYTES,
+  MAX_PROJECTS_PER_WORKSPACE,
   MAX_SHOTS_PER_PROJECT,
   OFFSET_MAX,
   OFFSET_MIN,
@@ -41,15 +45,20 @@ import {
 } from "@/lib/model/limits";
 
 export const PROJECT_FORMAT = "screenshot-studio";
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 5;
 export const PROJECT_FILE_EXT = ".studio";
 
 /**
- * The `.studio` file is a ZIP container: a small `manifest.json` describing the
- * project plus the raw image bytes under `images/`. Storing images as binary
- * (instead of base64 in JSON) avoids the ~33% base64 inflation and keeps the
- * manifest small and fast to parse. Each shot carries its own image plus a
- * claim/subtext caption.
+ * The `.studio` file is a ZIP container: a small `manifest.json` plus the raw
+ * image bytes under `images/`. Storing images as binary (instead of base64 in
+ * JSON) avoids the ~33% base64 inflation and keeps the manifest small.
+ *
+ * Two manifest shapes are read:
+ *  - single project — `{ project: {...} }` (also the pre-v5 shape)
+ *  - workspace — `{ folders: [...], projects: [...] }`, which can hold one
+ *    project, a folder and its projects, a selection, or the entire local
+ *    setup. Folders are referenced from projects by a bundle-local `ref` handle
+ *    (resolved to fresh ids on import) so membership survives a round-trip.
  */
 
 /** A reference from the manifest to an image entry inside the archive. */
@@ -69,18 +78,33 @@ type ManifestShot = {
   scale: number | null;
 };
 
+/** The per-project payload, shared by the single and workspace shapes. */
+type ManifestProject = {
+  name: string;
+  presetId: string;
+  background: ManifestBackground;
+  text: TextStyle;
+  device: DeviceStyle;
+  shots: ManifestShot[];
+};
+
+type ManifestFolder = { name: string; ref: string };
+
 type Manifest = {
   format: string;
   version: number;
   exportedAt: string;
-  project: {
-    name: string;
-    presetId: string;
-    background: ManifestBackground;
-    text: TextStyle;
-    device: DeviceStyle;
-    shots: ManifestShot[];
-  };
+  /** Single-project shape. */
+  project?: ManifestProject;
+  /** Workspace shape. */
+  folders?: ManifestFolder[];
+  projects?: (ManifestProject & { folderRef: string | null })[];
+};
+
+/** A validated import payload: fresh folders plus projects wired to them. */
+export type WorkspacePayload = {
+  folders: Folder[];
+  projects: Project[];
 };
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -115,18 +139,24 @@ function addImage(zip: JSZip, dataUrl: string | null, name: string): ImageRef {
   return { path, mime: parsed.mime };
 }
 
-/** Builds a `.studio` ZIP archive for a project. */
-export async function buildProjectArchive(project: Project): Promise<Blob> {
-  const zip = new JSZip();
-
+/**
+ * Writes a project's images into the archive and returns its manifest payload.
+ * `prefix` namespaces the image paths so several projects can coexist in one
+ * workspace archive without colliding (e.g. `p0-shot-0`, `p1-shot-0`).
+ */
+function writeProject(
+  zip: JSZip,
+  project: Project,
+  prefix: string,
+): ManifestProject {
   const bg = project.background;
-  const manifestBackground: ManifestBackground =
+  const background: ManifestBackground =
     bg.type === "image"
-      ? { type: "image", image: addImage(zip, bg.image, "background") }
+      ? { type: "image", image: addImage(zip, bg.image, `${prefix}background`) }
       : bg;
 
   const shots: ManifestShot[] = project.shots.map((shot, i) => ({
-    image: addImage(zip, shot.image, `shot-${i}`),
+    image: addImage(zip, shot.image, `${prefix}shot-${i}`),
     claim: shot.claim,
     sub: shot.sub,
     offX: shot.offX,
@@ -134,28 +164,77 @@ export async function buildProjectArchive(project: Project): Promise<Blob> {
     scale: shot.scale,
   }));
 
+  return {
+    name: project.name,
+    presetId: project.presetId,
+    background,
+    text: project.text,
+    device: project.device,
+    shots,
+  };
+}
+
+/** Builds a single-project `.studio` ZIP archive. */
+export async function buildProjectArchive(project: Project): Promise<Blob> {
+  const zip = new JSZip();
   const manifest: Manifest = {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
     exportedAt: new Date().toISOString(),
-    project: {
-      name: project.name,
-      presetId: project.presetId,
-      background: manifestBackground,
-      text: project.text,
-      device: project.device,
-      shots,
-    },
+    project: writeProject(zip, project, ""),
   };
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-
   return zip.generateAsync({ type: "blob" });
 }
 
-/** Downloads a project as a `.studio` archive. */
+/**
+ * Builds a workspace `.studio` ZIP archive from any set of projects and the
+ * folders to preserve. A project whose `folderId` is not among `folders` is
+ * exported at the root (folderRef `null`).
+ */
+export async function buildWorkspaceArchive(
+  projects: Project[],
+  folders: Folder[],
+): Promise<Blob> {
+  const zip = new JSZip();
+
+  const manifestFolders: ManifestFolder[] = folders.map((f, i) => ({
+    name: f.name,
+    ref: `f${i}`,
+  }));
+  const idToRef = new Map(folders.map((f, i) => [f.id, `f${i}`]));
+
+  const manifestProjects = projects.map((project, i) => ({
+    ...writeProject(zip, project, `p${i}-`),
+    folderRef:
+      project.folderId != null ? (idToRef.get(project.folderId) ?? null) : null,
+  }));
+
+  const manifest: Manifest = {
+    format: PROJECT_FORMAT,
+    version: PROJECT_VERSION,
+    exportedAt: new Date().toISOString(),
+    folders: manifestFolders,
+    projects: manifestProjects,
+  };
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+  return zip.generateAsync({ type: "blob" });
+}
+
+/** Downloads a single project as a `.studio` archive. */
 export async function exportProjectFile(project: Project): Promise<void> {
   const blob = await buildProjectArchive(project);
   saveAs(blob, `${slugify(project.name)}${PROJECT_FILE_EXT}`);
+}
+
+/** Downloads a set of projects (and their folders) as a workspace archive. */
+export async function exportWorkspaceFile(
+  projects: Project[],
+  folders: Folder[],
+  baseName: string,
+): Promise<void> {
+  const blob = await buildWorkspaceArchive(projects, folders);
+  saveAs(blob, `${slugify(baseName)}${PROJECT_FILE_EXT}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,11 +374,13 @@ async function normalizeShot(zip: JSZip, raw: unknown): Promise<Shot> {
 }
 
 /**
- * Reads a `.studio` archive (Blob/File) into a validated {@link Project} with
- * fresh ids and timestamps. Throws with a user-facing message when the file is
- * not a valid screenshot-studio archive.
+ * Opens and validates a `.studio` archive, returning its zip handle and parsed
+ * manifest. Throws with a user-facing message when the file is not a valid
+ * screenshot-studio archive.
  */
-export async function readProjectFile(file: Blob): Promise<Project> {
+async function parseArchive(
+  file: Blob,
+): Promise<{ zip: JSZip; manifest: Manifest }> {
   if (file.size > MAX_PROJECT_FILE_BYTES) {
     throw new Error("File is too large");
   }
@@ -339,7 +420,19 @@ export async function readProjectFile(file: Blob): Promise<Project> {
     );
   }
 
-  const raw = (manifest.project ?? {}) as Record<string, unknown>;
+  return { zip, manifest };
+}
+
+/**
+ * Turns one untrusted manifest project entry into a validated {@link Project}
+ * with a fresh id and timestamps. `folderId` is left at the root; workspace
+ * imports rewire it afterwards.
+ */
+async function buildProjectFromRaw(
+  zip: JSZip,
+  rawInput: unknown,
+): Promise<Project> {
+  const raw = (rawInput ?? {}) as Record<string, unknown>;
 
   const rawShots = Array.isArray(raw.shots)
     ? raw.shots.slice(0, MAX_SHOTS_PER_PROJECT)
@@ -364,5 +457,66 @@ export async function readProjectFile(file: Blob): Promise<Project> {
     text: normalizeText(raw.text),
     device: normalizeDevice(raw.device),
     shots,
+    folderId: null,
   };
+}
+
+/**
+ * Reads a `.studio` archive into a single {@link Project}. Accepts both the
+ * single-project and workspace shapes (returns the first project of a
+ * workspace). Throws when the archive contains no project.
+ */
+export async function readProjectFile(file: Blob): Promise<Project> {
+  const { zip, manifest } = await parseArchive(file);
+  const rawProject = Array.isArray(manifest.projects)
+    ? manifest.projects[0]
+    : manifest.project;
+  if (!rawProject) throw new Error("The archive contains no project");
+  return buildProjectFromRaw(zip, rawProject);
+}
+
+/**
+ * Reads a `.studio` archive into a validated {@link WorkspacePayload}: folders
+ * with fresh ids, and projects wired to them (via the manifest's `folderRef`
+ * handles). A single-project archive reads as one project and no folders.
+ */
+export async function readWorkspaceFile(file: Blob): Promise<WorkspacePayload> {
+  const { zip, manifest } = await parseArchive(file);
+
+  // Single-project archive → one project, no folders.
+  if (!Array.isArray(manifest.projects)) {
+    if (!manifest.project) throw new Error("The archive contains no project");
+    return {
+      folders: [],
+      projects: [await buildProjectFromRaw(zip, manifest.project)],
+    };
+  }
+
+  // Workspace archive: resolve folder refs to fresh folder ids.
+  const rawFolders = Array.isArray(manifest.folders)
+    ? manifest.folders.slice(0, MAX_FOLDERS_PER_WORKSPACE)
+    : [];
+  const refToId = new Map<string, string>();
+  const folders: Folder[] = [];
+  for (const rawFolder of rawFolders) {
+    const rf = (rawFolder ?? {}) as Record<string, unknown>;
+    const name =
+      typeof rf.name === "string" && rf.name.trim() ? rf.name : "Folder";
+    const folder = makeFolder(name.slice(0, CAPTION_MAX_LENGTH));
+    folders.push(folder);
+    if (typeof rf.ref === "string") refToId.set(rf.ref, folder.id);
+  }
+
+  const rawProjects = manifest.projects.slice(0, MAX_PROJECTS_PER_WORKSPACE);
+  const projects = await Promise.all(
+    rawProjects.map(async (rawProject) => {
+      const project = await buildProjectFromRaw(zip, rawProject);
+      const ref = (rawProject as Record<string, unknown>)?.folderRef;
+      project.folderId =
+        typeof ref === "string" ? (refToId.get(ref) ?? null) : null;
+      return project;
+    }),
+  );
+
+  return { folders, projects };
 }

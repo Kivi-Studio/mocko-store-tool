@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 import JSZip from "jszip";
 import {
   buildProjectArchive,
+  buildWorkspaceArchive,
   readProjectFile,
+  readWorkspaceFile,
   PROJECT_FORMAT,
   PROJECT_VERSION,
 } from "@/lib/storage/project-file";
-import { makeProject } from "@/lib/model/defaults";
+import { makeFolder, makeProject } from "@/lib/model/defaults";
 import { MAX_SHOTS_PER_PROJECT } from "@/lib/model/limits";
 import type { Project } from "@/lib/model/types";
 
@@ -69,6 +71,50 @@ describe("archive round-trip", () => {
   it("assigns fresh ids on import", async () => {
     const parsed = await readProjectFile(await buildProjectArchive(sample()));
     expect(parsed.shots[0].id).not.toBe("x");
+  });
+});
+
+describe("workspace round-trip", () => {
+  it("preserves folders and per-project membership", async () => {
+    const folder = makeFolder("Marketing");
+    const inFolder = sample();
+    inFolder.name = "A";
+    inFolder.folderId = folder.id;
+    const atRoot = sample();
+    atRoot.name = "B";
+    atRoot.folderId = null;
+
+    const payload = await readWorkspaceFile(
+      await buildWorkspaceArchive([inFolder, atRoot], [folder]),
+    );
+
+    expect(payload.folders).toHaveLength(1);
+    expect(payload.folders[0].name).toBe("Marketing");
+    // Folders get fresh ids on import.
+    expect(payload.folders[0].id).not.toBe(folder.id);
+
+    const a = payload.projects.find((p) => p.name === "A")!;
+    const b = payload.projects.find((p) => p.name === "B")!;
+    expect(a.folderId).toBe(payload.folders[0].id);
+    expect(b.folderId).toBeNull();
+  });
+
+  it("reads a single-project archive as one project, no folders", async () => {
+    const payload = await readWorkspaceFile(
+      await buildProjectArchive(sample()),
+    );
+    expect(payload.folders).toHaveLength(0);
+    expect(payload.projects).toHaveLength(1);
+    expect(payload.projects[0].folderId).toBeNull();
+  });
+
+  it("drops a project's folderRef when the folder is absent", async () => {
+    const orphan = sample();
+    orphan.folderId = "missing-folder";
+    const payload = await readWorkspaceFile(
+      await buildWorkspaceArchive([orphan], []),
+    );
+    expect(payload.projects[0].folderId).toBeNull();
   });
 });
 

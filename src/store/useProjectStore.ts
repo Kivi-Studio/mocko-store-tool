@@ -10,11 +10,13 @@ import { temporal } from "zundo";
 import type {
   Background,
   DeviceStyle,
+  Folder,
   Project,
   Shot,
   TextStyle,
+  ViewMode,
 } from "@/lib/model/types";
-import { makeProject, makeShot } from "@/lib/model/defaults";
+import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
 import { createIdbStorage, onExternalWrite } from "@/lib/storage/idb-storage";
 import { createId, uniqueName } from "@/lib/utils";
 
@@ -34,14 +36,38 @@ export type ProjectStore = {
   projects: Record<string, Project>;
   /** Gallery order, newest first. */
   projectOrder: string[];
+  /** Folders keyed by id. */
+  folders: Record<string, Folder>;
+  /** Folder display order, newest first. */
+  folderOrder: string[];
+  /** How the gallery lists items (persisted, not undoable). */
+  viewMode: ViewMode;
 
-  createProject: (name?: string) => string;
+  createProject: (name?: string, folderId?: string | null) => string;
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => string | null;
   moveProject: (id: string, dir: MoveDir) => void;
-  /** Adds an already-built project (e.g. from a `.studio` import). */
+  /** Adds an already-built project (e.g. from a `.studio` import). Lands at root. */
   addProject: (project: Project) => string;
+  /**
+   * Imports a workspace payload (folders + projects, already carrying fresh
+   * ids). `"add"` merges it in, uniquifying names; `"replace"` discards the
+   * current setup first.
+   */
+  importWorkspace: (
+    payload: { folders: Folder[]; projects: Project[] },
+    mode: "add" | "replace",
+  ) => void;
+
+  createFolder: (name?: string) => string;
+  renameFolder: (id: string, name: string) => void;
+  /** Deletes a folder; its projects fall back to the root, they are not removed. */
+  deleteFolder: (id: string) => void;
+  /** Moves a project into a folder, or to the root with `null`. */
+  moveProjectToFolder: (projectId: string, folderId: string | null) => void;
+
+  setViewMode: (mode: ViewMode) => void;
 
   patchSettings: (id: string, patch: SettingsPatch) => void;
   addShots: (id: string, images: string[]) => void;
@@ -93,11 +119,16 @@ export const useProjectStore = create<ProjectStore>()(
       (set, get) => ({
         projects: {},
         projectOrder: [],
+        folders: {},
+        folderOrder: [],
+        viewMode: "grid",
 
-        createProject: (name) => {
+        createProject: (name, folderId = null) => {
           const taken = Object.values(get().projects).map((p) => p.name);
+          const target = folderId && get().folders[folderId] ? folderId : null;
           const project = makeProject(
             uniqueName(name ?? "Untitled project", taken),
+            target,
           );
           set((s) => ({
             projects: { ...s.projects, [project.id]: project },
@@ -108,11 +139,58 @@ export const useProjectStore = create<ProjectStore>()(
 
         addProject: (project) => {
           set((s) => ({
-            projects: { ...s.projects, [project.id]: project },
+            // Imported projects always land at the root — their `folderId`
+            // (if any) refers to folders from another app instance.
+            projects: { ...s.projects, [project.id]: { ...project, folderId: null } },
             projectOrder: [project.id, ...s.projectOrder],
           }));
           return project.id;
         },
+
+        importWorkspace: (payload, mode) =>
+          set((s) => {
+            if (mode === "replace") {
+              const projects: Record<string, Project> = {};
+              for (const p of payload.projects) projects[p.id] = p;
+              const folders: Record<string, Folder> = {};
+              for (const f of payload.folders) folders[f.id] = f;
+              return {
+                projects,
+                projectOrder: payload.projects.map((p) => p.id),
+                folders,
+                folderOrder: payload.folders.map((f) => f.id),
+              };
+            }
+            // Merge: keep existing, prepend imports, uniquify names as we go.
+            const takenProjectNames = new Set(
+              Object.values(s.projects).map((p) => p.name),
+            );
+            const takenFolderNames = new Set(
+              Object.values(s.folders).map((f) => f.name),
+            );
+            const folders = { ...s.folders };
+            const newFolderIds: string[] = [];
+            for (const f of payload.folders) {
+              const name = uniqueName(f.name, takenFolderNames);
+              takenFolderNames.add(name);
+              folders[f.id] = { ...f, name };
+              newFolderIds.push(f.id);
+            }
+            const projects = { ...s.projects };
+            const newProjectIds: string[] = [];
+            for (const p of payload.projects) {
+              const name = uniqueName(p.name, takenProjectNames);
+              takenProjectNames.add(name);
+              projects[p.id] = { ...p, name };
+              newProjectIds.push(p.id);
+            }
+            return {
+              projects,
+              projectOrder: [...newProjectIds, ...s.projectOrder],
+              folders,
+              folderOrder: [...newFolderIds, ...s.folderOrder],
+            };
+          }),
 
         renameProject: (id, name) =>
           set((s) => withProject(s, id, (p) => ({ ...p, name }))),
@@ -165,6 +243,64 @@ export const useProjectStore = create<ProjectStore>()(
             [order[i], order[j]] = [order[j], order[i]];
             return { projectOrder: order };
           }),
+
+        createFolder: (name) => {
+          const taken = Object.values(get().folders).map((f) => f.name);
+          const folder = makeFolder(uniqueName(name ?? "New folder", taken));
+          set((s) => ({
+            folders: { ...s.folders, [folder.id]: folder },
+            folderOrder: [folder.id, ...s.folderOrder],
+          }));
+          return folder.id;
+        },
+
+        renameFolder: (id, name) =>
+          set((s) => {
+            const f = s.folders[id];
+            if (!f) return s;
+            return {
+              folders: {
+                ...s.folders,
+                [id]: { ...f, name, updatedAt: Date.now() },
+              },
+            };
+          }),
+
+        deleteFolder: (id) =>
+          set((s) => {
+            if (!s.folders[id]) return s;
+            const folders = { ...s.folders };
+            delete folders[id];
+            // Orphaned projects fall back to the root rather than being deleted.
+            const projects = { ...s.projects };
+            for (const pid of s.projectOrder) {
+              const p = projects[pid];
+              if (p?.folderId === id) {
+                projects[pid] = { ...p, folderId: null, updatedAt: Date.now() };
+              }
+            }
+            return {
+              folders,
+              folderOrder: s.folderOrder.filter((x) => x !== id),
+              projects,
+            };
+          }),
+
+        moveProjectToFolder: (projectId, folderId) =>
+          set((s) => {
+            const p = s.projects[projectId];
+            if (!p) return s;
+            const target = folderId && s.folders[folderId] ? folderId : null;
+            if (p.folderId === target) return s;
+            return {
+              projects: {
+                ...s.projects,
+                [projectId]: { ...p, folderId: target, updatedAt: Date.now() },
+              },
+            };
+          }),
+
+        setViewMode: (mode) => set({ viewMode: mode }),
 
         patchSettings: (id, patch) =>
           set((s) => withProject(s, id, (p) => ({ ...p, ...patch }))),
@@ -255,27 +391,62 @@ export const useProjectStore = create<ProjectStore>()(
       }),
       {
         name: "screenshot-studio",
-        // Bumped when the shot/project shape changes (v4 dropped multilingual
-        // captions — Shot now holds a single claim/sub). The app is pre-release,
-        // so older local state is intentionally discarded rather than migrated;
-        // `migrate` returns a clean slate (and silences persist's warning).
-        version: 4,
-        migrate: () => ({ projects: {}, projectOrder: [] }),
+        // v5 added folders and a per-project folderId. That change is purely
+        // additive, so v4 state is migrated in place (existing projects are
+        // kept, just given `folderId: null`). Anything older than v4 predates
+        // the current shot shape and is discarded (the app is pre-release).
+        version: 5,
+        migrate: (persisted, version) => {
+          const empty = {
+            projects: {},
+            projectOrder: [],
+            folders: {},
+            folderOrder: [],
+          };
+          if (version !== 4 || !persisted || typeof persisted !== "object") {
+            return empty;
+          }
+          const s = persisted as {
+            projects?: Record<string, Project>;
+            projectOrder?: string[];
+          };
+          const projects: Record<string, Project> = {};
+          for (const [id, p] of Object.entries(s.projects ?? {})) {
+            projects[id] = { ...p, folderId: p.folderId ?? null };
+          }
+          return {
+            projects,
+            projectOrder: s.projectOrder ?? Object.keys(projects),
+            folders: {},
+            folderOrder: [],
+          };
+        },
         storage: createIdbStorage(),
         partialize: (state) => ({
           projects: state.projects,
           projectOrder: state.projectOrder,
+          folders: state.folders,
+          folderOrder: state.folderOrder,
+          // A persisted UI preference — restored across sessions.
+          viewMode: state.viewMode,
         }),
       },
     ),
     {
       limit: 100,
+      // Undo tracks data only; the view mode is a UI preference and must not
+      // create undo steps.
       partialize: (state) => ({
         projects: state.projects,
         projectOrder: state.projectOrder,
+        folders: state.folders,
+        folderOrder: state.folderOrder,
       }),
       equality: (a, b) =>
-        a.projects === b.projects && a.projectOrder === b.projectOrder,
+        a.projects === b.projects &&
+        a.projectOrder === b.projectOrder &&
+        a.folders === b.folders &&
+        a.folderOrder === b.folderOrder,
     },
   ),
 );

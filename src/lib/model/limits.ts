@@ -49,6 +49,10 @@ export const CAPTION_MAX_LENGTH = 2000;
 /** Maximum shots kept from a single imported project. */
 export const MAX_SHOTS_PER_PROJECT = 60;
 
+/** Maximum projects/folders kept from a single imported workspace archive. */
+export const MAX_PROJECTS_PER_WORKSPACE = 500;
+export const MAX_FOLDERS_PER_WORKSPACE = 200;
+
 /** Screenshot uploads: allowed types and maximum file size. */
 export const ACCEPTED_IMAGE_TYPES = [
   "image/png",
@@ -58,7 +62,11 @@ export const ACCEPTED_IMAGE_TYPES = [
 ] as const;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-/** A `.studio` archive (ZIP) is decompressed fully in memory, so it is capped. */
-export const MAX_PROJECT_FILE_BYTES = 80 * 1024 * 1024;
+/**
+ * A `.studio` archive (ZIP) is decompressed fully in memory, so it is capped.
+ * The cap is generous because a full-workspace backup bundles every project's
+ * source screenshots.
+ */
+export const MAX_PROJECT_FILE_BYTES = 500 * 1024 * 1024;
 /** Manifest JSON size cap (guards against a huge inline payload). */
 export const MAX_MANIFEST_CHARS = 5 * 1024 * 1024;

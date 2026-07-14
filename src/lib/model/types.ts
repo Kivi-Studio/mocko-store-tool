@@ -124,4 +124,20 @@ export type Project = {
   device: DeviceStyle;
   /** Ordered screenshots. */
   shots: Shot[];
+  /**
+   * Owning folder id, or `null` when the project lives at the gallery root.
+   * Folders are a single flat level — a folder never contains another folder.
+   */
+  folderId: string | null;
 };
+
+/** A one-level grouping of projects in the gallery. */
+export type Folder = {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** How the gallery lists folders and projects. */
+export type ViewMode = "grid" | "list";

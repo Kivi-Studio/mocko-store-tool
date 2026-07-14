@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore } from "@/store/useProjectStore";
 import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
+import { makeFolder, makeProject } from "@/lib/model/defaults";
 
 const store = () => useProjectStore.getState();
 const shots = (id: string) => store().projects[id].shots;
 
 beforeEach(() => {
-  useProjectStore.setState({ projects: {}, projectOrder: [] });
+  useProjectStore.setState({
+    projects: {},
+    projectOrder: [],
+    folders: {},
+    folderOrder: [],
+    viewMode: "grid",
+  });
   useProjectStore.temporal.getState().clear();
 });
 
@@ -130,6 +137,118 @@ describe("shots & captions", () => {
     expect(shots(id)[0].offX).toBe(0.3);
     useProjectStore.temporal.getState().undo();
     expect(shots(id)[0].offX).toBe(0);
+  });
+});
+
+describe("folders", () => {
+  it("creates a folder, newest first, with unique names", () => {
+    const a = store().createFolder("Work");
+    const b = store().createFolder("Work");
+    expect(store().folderOrder).toEqual([b, a]);
+    expect(store().folders[a].name).toBe("Work");
+    expect(store().folders[b].name).toBe("Work (2)");
+  });
+
+  it("creates a project inside a folder", () => {
+    const f = store().createFolder("F");
+    const p = store().createProject("P", f);
+    expect(store().projects[p].folderId).toBe(f);
+  });
+
+  it("defaults a project to the root and ignores unknown folder ids", () => {
+    const root = store().createProject("Root");
+    const bogus = store().createProject("Bogus", "nope");
+    expect(store().projects[root].folderId).toBeNull();
+    expect(store().projects[bogus].folderId).toBeNull();
+  });
+
+  it("moves a project into and back out of a folder", () => {
+    const f = store().createFolder("F");
+    const p = store().createProject("P");
+    store().moveProjectToFolder(p, f);
+    expect(store().projects[p].folderId).toBe(f);
+    store().moveProjectToFolder(p, null);
+    expect(store().projects[p].folderId).toBeNull();
+  });
+
+  it("ignores moves to an unknown folder (stays at root)", () => {
+    const p = store().createProject("P");
+    store().moveProjectToFolder(p, "nope");
+    expect(store().projects[p].folderId).toBeNull();
+  });
+
+  it("deletes a folder and reparents its projects to the root", () => {
+    const f = store().createFolder("F");
+    const inside = store().createProject("Inside", f);
+    const outside = store().createProject("Outside");
+    store().deleteFolder(f);
+    expect(store().folders[f]).toBeUndefined();
+    expect(store().folderOrder).not.toContain(f);
+    expect(store().projects[inside].folderId).toBeNull();
+    expect(store().projects[outside].folderId).toBeNull();
+    // The projects themselves survive.
+    expect(store().projectOrder).toContain(inside);
+  });
+
+  it("carries the folder over when duplicating a project", () => {
+    const f = store().createFolder("F");
+    const p = store().createProject("P", f);
+    const copy = store().duplicateProject(p)!;
+    expect(store().projects[copy].folderId).toBe(f);
+  });
+
+  it("renames a folder", () => {
+    const f = store().createFolder("Old");
+    store().renameFolder(f, "New");
+    expect(store().folders[f].name).toBe("New");
+  });
+
+  it("sets the view mode without creating an undo step", () => {
+    store().createProject("P");
+    useProjectStore.temporal.getState().clear();
+    store().setViewMode("list");
+    expect(store().viewMode).toBe("list");
+    expect(useProjectStore.temporal.getState().pastStates.length).toBe(0);
+  });
+
+  it("undoes folder creation", () => {
+    store().createProject("P");
+    useProjectStore.temporal.getState().clear();
+    const f = store().createFolder("F");
+    expect(store().folders[f]).toBeDefined();
+    useProjectStore.temporal.getState().undo();
+    expect(store().folders[f]).toBeUndefined();
+  });
+});
+
+describe("workspace import", () => {
+  it("merges a payload, uniquifying folder and project names", () => {
+    store().createFolder("Marketing");
+    store().createProject("A");
+
+    const folder = makeFolder("Marketing");
+    const project = makeProject("A", folder.id);
+    store().importWorkspace({ folders: [folder], projects: [project] }, "add");
+
+    expect(store().folders[folder.id].name).toBe("Marketing (2)");
+    expect(store().projects[project.id].name).toBe("A (2)");
+    // Membership survives the rename.
+    expect(store().projects[project.id].folderId).toBe(folder.id);
+    // Imports are prepended (newest first).
+    expect(store().projectOrder[0]).toBe(project.id);
+    expect(store().folderOrder[0]).toBe(folder.id);
+  });
+
+  it("replaces the whole setup", () => {
+    store().createFolder("Old folder");
+    store().createProject("Old");
+
+    const project = makeProject("New");
+    store().importWorkspace({ folders: [], projects: [project] }, "replace");
+
+    expect(Object.keys(store().projects)).toEqual([project.id]);
+    expect(store().projectOrder).toEqual([project.id]);
+    expect(store().folderOrder).toEqual([]);
   });
 });
 

@@ -1,5 +1,6 @@
 import type {
   DeviceStyle,
+  Folder,
   GradientBackground,
   Project,
   Shot,
@@ -45,7 +46,7 @@ export function makeShot(image: string | null): Shot {
   };
 }
 
-export function makeProject(name: string): Project {
+export function makeProject(name: string, folderId: string | null = null): Project {
   const now = Date.now();
   return {
     id: createId(),
@@ -57,5 +58,16 @@ export function makeProject(name: string): Project {
     text: { ...DEFAULT_TEXT },
     device: { ...DEFAULT_DEVICE },
     shots: [],
+    folderId,
+  };
+}
+
+export function makeFolder(name: string): Folder {
+  const now = Date.now();
+  return {
+    id: createId(),
+    name,
+    createdAt: now,
+    updatedAt: now,
   };
 }
