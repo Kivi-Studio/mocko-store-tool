@@ -53,13 +53,35 @@ npm run dev
 
 Anschließend [http://localhost:3000](http://localhost:3000) im Browser öffnen.
 
+## Build & Deployment
+
+Die App ist vollständig clientseitig und wird als **statischer Export**
+(`output: "export"`) gebaut — es gibt keinen Node-Server im Betrieb.
+
+```bash
+# Produktions-Build erzeugen → schreibt nach out/
+npm run build
+```
+
+Das Ergebnis liegt anschließend im Ordner `out/` (statisches HTML/JS/CSS) und
+kann von jedem beliebigen Static-Host ausgeliefert werden — z. B. netcup Shared
+Hosting per FTP. Die Sicherheits-Header werden dabei über
+[`public/.htaccess`](public/.htaccess) (Apache) gesetzt, das beim Build nach
+`out/` kopiert wird.
+
+Zum lokalen Prüfen des Builds genügt ein beliebiger Static-Server, z. B.:
+
+```bash
+npx serve out
+```
+
 ## npm-Scripts
 
 | Script                 | Beschreibung                                            |
 | ---------------------- | ------------------------------------------------------- |
 | `npm run dev`          | Startet den Next.js-Entwicklungsserver (Port 3000)      |
-| `npm run build`        | Erstellt den Produktions-Build                          |
-| `npm run start`        | Startet den Produktions-Server (nach `build`)           |
+| `npm run build`        | Erstellt den statischen Produktions-Build nach `out/`   |
+| `npm run start`        | (bei `output: "export"` nicht genutzt — siehe Build)    |
 | `npm run lint`         | ESLint                                                  |
 | `npm run typecheck`    | `next typegen` + TypeScript-Typprüfung (`tsc --noEmit`) |
 | `npm run format`       | Prettier — formatiert alle Dateien                      |
