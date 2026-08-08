@@ -36,7 +36,8 @@ export function EditorTopbar({ project }: { project: Project }) {
   return (
     <header className="bg-card flex h-14 shrink-0 items-center gap-2 border-b px-3">
       <Link
-        href="/"
+        // Back lands where the project lives — its folder, or the root view.
+        href={project.folderId ? `/?folder=${project.folderId}` : "/"}
         aria-label="Back to projects"
         className={buttonVariants({ variant: "ghost", size: "icon" })}
       >
