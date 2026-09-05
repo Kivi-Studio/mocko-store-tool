@@ -197,6 +197,27 @@ describe("folders", () => {
     expect(store().projects[copy].folderId).toBe(f);
   });
 
+  it("scopes project name uniqueness to the folder", () => {
+    const f = store().createFolder("Release");
+    const root = store().createProject("iPhone (de)");
+    const inside = store().createProject("iPhone (de)", f);
+    // Same name, different folders — no " (2)" suffix.
+    expect(store().projects[root].name).toBe("iPhone (de)");
+    expect(store().projects[inside].name).toBe("iPhone (de)");
+    // Within one folder it still uniquifies.
+    const second = store().createProject("iPhone (de)", f);
+    expect(store().projects[second].name).toBe("iPhone (de) (2)");
+  });
+
+  it("uniquifies a name that collides when moving into a folder", () => {
+    const f = store().createFolder("Release");
+    store().createProject("iPhone (de)", f);
+    const moved = store().createProject("iPhone (de)");
+    store().moveProjectToFolder(moved, f);
+    expect(store().projects[moved].name).toBe("iPhone (de) (2)");
+    expect(store().projects[moved].folderId).toBe(f);
+  });
+
   it("renames a folder", () => {
     const f = store().createFolder("Old");
     store().renameFolder(f, "New");
@@ -221,8 +242,284 @@ describe("folders", () => {
   });
 });
 
+describe("duplicateFolder", () => {
+  /** A folder with two named projects, the first carrying one captioned shot. */
+  const seedRelease = () => {
+    const f = store().createFolder("Mocko 1.2.0");
+    const a = store().createProject("iPhone (de)", f);
+    const b = store().createProject("iPad (de)", f);
+    store().addShots(a, ["data:a"]);
+    store().updateShotText(a, shots(a)[0].id, { claim: "Hi" });
+    return { f, a, b };
+  };
+
+  const projectsIn = (folderId: string) =>
+    store()
+      .projectOrder.map((id) => store().projects[id])
+      .filter((p) => p.folderId === folderId);
+
+  it("copies the folder and every project inside it, keeping names and order", () => {
+    const { f } = seedRelease();
+    const copyId = store().duplicateFolder(f, "Mocko 1.3.0")!;
+
+    expect(store().folders[copyId].name).toBe("Mocko 1.3.0");
+    // Right after the source, not at the top.
+    expect(store().folderOrder).toEqual([f, copyId]);
+
+    const copies = projectsIn(copyId);
+    expect(copies.map((p) => p.name)).toEqual(projectsIn(f).map((p) => p.name));
+    expect(copies.map((p) => p.name)).toEqual(["iPad (de)", "iPhone (de)"]);
+  });
+
+  it("deep-copies shots so the copy is independent", () => {
+    const { f, a } = seedRelease();
+    const copyId = store().duplicateFolder(f)!;
+    const copy = projectsIn(copyId).find((p) => p.name === "iPhone (de)")!;
+
+    expect(copy.id).not.toBe(a);
+    expect(copy.shots[0].id).not.toBe(shots(a)[0].id);
+    expect(copy.shots[0].claim).toBe("Hi");
+
+    store().updateShotText(copy.id, copy.shots[0].id, { claim: "X" });
+    expect(shots(a)[0].claim).toBe("Hi");
+  });
+
+  it("defaults to a “copy” name and uniquifies it", () => {
+    const f = store().createFolder("Release");
+    const first = store().duplicateFolder(f)!;
+    const second = store().duplicateFolder(f)!;
+    expect(store().folders[first].name).toBe("Release copy");
+    expect(store().folders[second].name).toBe("Release copy (2)");
+  });
+
+  it("duplicates an empty folder and ignores an unknown id", () => {
+    const f = store().createFolder("Empty");
+    const copyId = store().duplicateFolder(f)!;
+    expect(projectsIn(copyId)).toEqual([]);
+    expect(store().duplicateFolder("nope")).toBeNull();
+  });
+
+  it("is a single undo step", () => {
+    const { f } = seedRelease();
+    useProjectStore.temporal.getState().clear();
+    const copyId = store().duplicateFolder(f)!;
+    expect(projectsIn(copyId)).toHaveLength(2);
+    useProjectStore.temporal.getState().undo();
+    expect(store().folders[copyId]).toBeUndefined();
+    expect(projectsIn(copyId)).toEqual([]);
+  });
+});
+
+describe("createFolderVersion", () => {
+  /** A release folder with one project holding a captioned, positioned shot. */
+  const seed = () => {
+    const f = store().createFolder("Mocko 1.2.0");
+    const p = store().createProject("iPhone (de)", f);
+    store().addShots(p, ["data:a", "data:b"]);
+    store().updateShotText(p, shots(p)[0].id, { claim: "Hi", sub: "There" });
+    store().updateShotLayout(p, shots(p)[0].id, { offX: 0.2, scale: 0.6 });
+    return { f, p };
+  };
+
+  const copiedShots = (folderId: string) =>
+    store()
+      .projectOrder.map((id) => store().projects[id])
+      .filter((x) => x.folderId === folderId)[0].shots;
+
+  it("uses the supplied name and keeps everything by default", () => {
+    const { f } = seed();
+    const v = store().createFolderVersion(f, "Mocko 1.3.0", {
+      keepImages: true,
+      keepCaptions: true,
+    })!;
+    expect(store().folders[v].name).toBe("Mocko 1.3.0");
+    expect(copiedShots(v).map((sh) => sh.image)).toEqual(["data:a", "data:b"]);
+    expect(copiedShots(v)[0]).toMatchObject({ claim: "Hi", sub: "There" });
+  });
+
+  it("clears images but keeps captions, count and layout", () => {
+    const { f } = seed();
+    const v = store().createFolderVersion(f, "Mocko 1.3.0", {
+      keepImages: false,
+      keepCaptions: true,
+    })!;
+    const copies = copiedShots(v);
+    expect(copies).toHaveLength(2);
+    expect(copies.map((sh) => sh.image)).toEqual([null, null]);
+    expect(copies[0]).toMatchObject({
+      claim: "Hi",
+      sub: "There",
+      offX: 0.2,
+      scale: 0.6,
+    });
+  });
+
+  it("clears captions but keeps images", () => {
+    const { f } = seed();
+    const v = store().createFolderVersion(f, "Mocko 1.3.0", {
+      keepImages: true,
+      keepCaptions: false,
+    })!;
+    expect(copiedShots(v)[0]).toMatchObject({
+      image: "data:a",
+      claim: "",
+      sub: "",
+    });
+  });
+
+  it("keeps the design, including a background image, when images are cleared", () => {
+    const { f, p } = seed();
+    store().patchSettings(p, {
+      background: { type: "image", image: "data:bg" },
+      device: { ...store().projects[p].device, frameColor: "#FF0000" },
+    });
+    const v = store().createFolderVersion(f, "Mocko 1.3.0", {
+      keepImages: false,
+      keepCaptions: false,
+    })!;
+    const copy = store()
+      .projectOrder.map((id) => store().projects[id])
+      .find((x) => x.folderId === v)!;
+    expect(copy.background).toEqual({ type: "image", image: "data:bg" });
+    expect(copy.device.frameColor).toBe("#FF0000");
+  });
+
+  it("leaves the source untouched and uniquifies a taken name", () => {
+    const { f, p } = seed();
+    store().createFolder("Mocko 1.3.0");
+    const v = store().createFolderVersion(f, "Mocko 1.3.0", {
+      keepImages: false,
+      keepCaptions: false,
+    })!;
+    expect(store().folders[v].name).toBe("Mocko 1.3.0 (2)");
+    // The original release is a snapshot — it must not change.
+    expect(shots(p)[0]).toMatchObject({ image: "data:a", claim: "Hi" });
+  });
+
+  it("ignores an unknown folder id", () => {
+    expect(
+      store().createFolderVersion("nope", "X 1.0.0", {
+        keepImages: true,
+        keepCaptions: true,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("applyToProjects", () => {
+  /** A folder with a captioned, styled master and two thinner siblings. */
+  const seed = () => {
+    const f = store().createFolder("Mocko 1.2.0");
+    const master = store().createProject("iPhone (de)", f);
+    const ipad = store().createProject("iPad (de)", f);
+    const play = store().createProject("Play (de)", f);
+    store().addShots(master, ["m1", "m2", "m3"]);
+    store().addShots(ipad, ["i1"]);
+    store().addShots(play, ["p1", "p2", "p3", "p4"]);
+    store().patchSettings(master, {
+      presetId: "ipad-13",
+      background: { type: "solid", color: "#123456" },
+      device: { ...store().projects[master].device, frameColor: "#FF0000" },
+    });
+    store().updateShotText(master, shots(master)[0].id, {
+      claim: "One",
+      sub: "Sub one",
+    });
+    store().updateShotText(master, shots(master)[2].id, { claim: "Three" });
+    return { f, master, ipad, play };
+  };
+
+  it("copies the design without touching preset or shots", () => {
+    const { master, ipad } = seed();
+    const n = store().applyToProjects(master, [ipad], {
+      design: true,
+      captions: false,
+    });
+    expect(n).toBe(1);
+    expect(store().projects[ipad].background).toEqual({
+      type: "solid",
+      color: "#123456",
+    });
+    expect(store().projects[ipad].device.frameColor).toBe("#FF0000");
+    // A variant is defined by its preset and its screenshots — never overwritten.
+    expect(store().projects[ipad].presetId).toBe(DEFAULT_PRESET_ID);
+    expect(shots(ipad).map((sh) => sh.image)).toEqual(["i1"]);
+  });
+
+  it("appends placeholders when the source has more shots (variant B)", () => {
+    const { master, ipad } = seed();
+    store().applyToProjects(master, [ipad], { design: false, captions: true });
+    const result = shots(ipad);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toMatchObject({
+      image: "i1",
+      claim: "One",
+      sub: "Sub one",
+    });
+    // The two extra captions arrive as empty placeholders, ready for images.
+    expect(result[1]).toMatchObject({ image: null, claim: "" });
+    expect(result[2]).toMatchObject({ image: null, claim: "Three" });
+  });
+
+  it("leaves surplus target shots untouched", () => {
+    const { master, play } = seed();
+    store().applyToProjects(master, [play], { design: false, captions: true });
+    const result = shots(play);
+    expect(result).toHaveLength(4);
+    expect(result[0].claim).toBe("One");
+    // The 4th shot has no counterpart in the source — image and text survive.
+    expect(result[3]).toMatchObject({ image: "p4", claim: "" });
+  });
+
+  it("does not copy the design when only captions are selected", () => {
+    const { master, ipad } = seed();
+    const before = store().projects[ipad].background;
+    store().applyToProjects(master, [ipad], { design: false, captions: true });
+    expect(store().projects[ipad].background).toEqual(before);
+  });
+
+  it("skips the source, unknown ids and empty option sets", () => {
+    const { master, ipad } = seed();
+    expect(
+      store().applyToProjects(master, [master, "nope"], {
+        design: true,
+        captions: true,
+      }),
+    ).toBe(0);
+    expect(
+      store().applyToProjects(master, [ipad], {
+        design: false,
+        captions: false,
+      }),
+    ).toBe(0);
+    expect(
+      store().applyToProjects("nope", [ipad], {
+        design: true,
+        captions: false,
+      }),
+    ).toBe(0);
+  });
+
+  it("hits several targets and undoes as one step", () => {
+    const { master, ipad, play } = seed();
+    useProjectStore.temporal.getState().clear();
+    const n = store().applyToProjects(master, [ipad, play], {
+      design: true,
+      captions: true,
+    });
+    expect(n).toBe(2);
+    expect(shots(ipad)).toHaveLength(3);
+    useProjectStore.temporal.getState().undo();
+    expect(shots(ipad)).toHaveLength(1);
+    expect(store().projects[play].background).not.toEqual({
+      type: "solid",
+      color: "#123456",
+    });
+  });
+});
+
 describe("workspace import", () => {
-  it("merges a payload, uniquifying folder and project names", () => {
+  it("merges a payload, uniquifying folder names", () => {
     store().createFolder("Marketing");
     store().createProject("A");
 
@@ -231,12 +528,20 @@ describe("workspace import", () => {
     store().importWorkspace({ folders: [folder], projects: [project] }, "add");
 
     expect(store().folders[folder.id].name).toBe("Marketing (2)");
-    expect(store().projects[project.id].name).toBe("A (2)");
-    // Membership survives the rename.
+    // The imported folder is empty, so its project keeps its name even though
+    // a project called "A" already exists at the root.
+    expect(store().projects[project.id].name).toBe("A");
     expect(store().projects[project.id].folderId).toBe(folder.id);
     // Imports are prepended (newest first).
     expect(store().projectOrder[0]).toBe(project.id);
     expect(store().folderOrder[0]).toBe(folder.id);
+  });
+
+  it("uniquifies imported project names against the root", () => {
+    store().createProject("A");
+    const project = makeProject("A");
+    store().importWorkspace({ folders: [], projects: [project] }, "add");
+    expect(store().projects[project.id].name).toBe("A (2)");
   });
 
   it("replaces the whole setup", () => {

@@ -2,19 +2,37 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Download, Redo2, Undo2 } from "lucide-react";
+import { ChevronLeft, Download, Redo2, SquareStack, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Project } from "@/lib/model/types";
 import { exportProjectZip } from "@/lib/render/export";
+import { useShallow } from "zustand/react/shallow";
 import { useProjectStore, useTemporal } from "@/store/useProjectStore";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { ApplyToSiblingsDialog } from "./ApplyToSiblingsDialog";
 
 export function EditorTopbar({ project }: { project: Project }) {
   const renameProject = useProjectStore((s) => s.renameProject);
+  const applyToProjects = useProjectStore((s) => s.applyToProjects);
+  // Only the other projects in this project's folder. Applying across the
+  // whole root would hit unrelated projects, so the action is folder-scoped.
+  const siblings = useProjectStore(
+    useShallow((s) =>
+      project.folderId === null
+        ? []
+        : s.projectOrder
+            .map((id) => s.projects[id])
+            .filter(
+              (p) =>
+                p && p.id !== project.id && p.folderId === project.folderId,
+            ),
+    ),
+  );
   const { canUndo, canRedo, undo, redo } = useTemporal();
   const [exporting, setExporting] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
 
   const handleExportClick = async () => {
     if (project.shots.length === 0) {
@@ -52,6 +70,16 @@ export function EditorTopbar({ project }: { project: Project }) {
 
       <div className="flex-1" />
 
+      {siblings.length > 0 && (
+        <>
+          <Button variant="outline" onClick={() => setApplyOpen(true)}>
+            <SquareStack className="size-4" />
+            Apply to…
+          </Button>
+          <Separator orientation="vertical" className="mx-1 h-6" />
+        </>
+      )}
+
       <Button
         variant="ghost"
         size="icon"
@@ -75,6 +103,25 @@ export function EditorTopbar({ project }: { project: Project }) {
         <Download className="size-4" />
         {exporting ? "Exporting…" : "Export all (ZIP)"}
       </Button>
+
+      {siblings.length > 0 && (
+        <ApplyToSiblingsDialog
+          // Remount on open so the selection starts fresh each time.
+          key={applyOpen ? "open" : "closed"}
+          open={applyOpen}
+          onOpenChange={setApplyOpen}
+          project={project}
+          siblings={siblings}
+          onSubmit={(targetIds, options) => {
+            const n = applyToProjects(project.id, targetIds, options);
+            if (n > 0) {
+              toast.success(
+                `Applied to ${n} ${n === 1 ? "project" : "projects"} — use undo to revert`,
+              );
+            }
+          }}
+        />
+      )}
     </header>
   );
 }

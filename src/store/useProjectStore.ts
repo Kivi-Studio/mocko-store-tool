@@ -23,6 +23,30 @@ import { createId, uniqueName } from "@/lib/utils";
 /** Reorder direction: one step towards the front (-1) or the back (1). */
 type MoveDir = -1 | 1;
 
+/**
+ * What a folder copy carries over from the source shots. Styling (background,
+ * text, device) always comes along — it is the folder's design, not its
+ * content — including a background image.
+ */
+export type FolderCopyOptions = {
+  /** Keep the screenshots; `false` leaves empty placeholders behind. */
+  keepImages: boolean;
+  /** Keep claim and subtext; `false` clears them. */
+  keepCaptions: boolean;
+};
+
+/** What {@link ProjectStore.applyToProjects} carries from one project to others. */
+export type ApplyOptions = {
+  /** Background, text and device styling — the look shared by a release. */
+  design: boolean;
+  /**
+   * Claim and subtext, matched by shot position. Shots the target does not
+   * have yet are appended as empty placeholders, so the target ends up
+   * mirroring the source's structure.
+   */
+  captions: boolean;
+};
+
 /** The mutable styling of a project (everything except its shots and identity). */
 type SettingsPatch = Partial<{
   name: string;
@@ -62,10 +86,39 @@ export type ProjectStore = {
 
   createFolder: (name?: string) => string;
   renameFolder: (id: string, name: string) => void;
+  /**
+   * Deep-copies a folder and every project inside it. The copies keep their
+   * source names — project names only need to be unique within their folder,
+   * and the new folder starts out empty.
+   */
+  duplicateFolder: (id: string, name?: string) => string | null;
+  /**
+   * Snapshots a release: like {@link ProjectStore.duplicateFolder}, but under a
+   * caller-supplied name (typically `"<App> 1.3.0"`) and with control over what
+   * the copied shots keep. Clearing the images leaves the shot count, captions
+   * and per-shot layout in place, ready for the next round of screenshots.
+   */
+  createFolderVersion: (
+    id: string,
+    name: string,
+    options: FolderCopyOptions,
+  ) => string | null;
   /** Deletes a folder; its projects fall back to the root, they are not removed. */
   deleteFolder: (id: string) => void;
   /** Moves a project into a folder, or to the root with `null`. */
   moveProjectToFolder: (projectId: string, folderId: string | null) => void;
+
+  /**
+   * Pushes one project's design and/or captions onto other projects — the way
+   * a finished master variant ("iPhone (de)") seeds its siblings. The export
+   * preset and the screenshots themselves are never touched, since those are
+   * exactly what makes a variant a variant. Returns how many projects changed.
+   */
+  applyToProjects: (
+    sourceId: string,
+    targetIds: string[],
+    options: ApplyOptions,
+  ) => number;
 
   setViewMode: (mode: ViewMode) => void;
 
@@ -97,6 +150,91 @@ export type ProjectStore = {
   reorderShots: (projectId: string, from: number, to: number) => void;
 };
 
+/**
+ * The project names taken inside one folder (`null` = the gallery root),
+ * optionally ignoring one project (when renaming or moving it).
+ *
+ * Names are unique per folder, not globally: two release folders may each hold
+ * an "iPhone (de)", which is what makes duplicating a folder produce an exact
+ * copy instead of a set of " (2)"-suffixed projects.
+ */
+function namesInFolder(
+  s: Pick<ProjectStore, "projects">,
+  folderId: string | null,
+  exceptId?: string,
+): string[] {
+  return Object.values(s.projects)
+    .filter((p) => p.folderId === folderId && p.id !== exceptId)
+    .map((p) => p.name);
+}
+
+/** A deep, independently mutable copy of a project with fresh ids. */
+function cloneProject(
+  src: Project,
+  name: string,
+  folderId: string | null,
+): Project {
+  const now = Date.now();
+  return {
+    ...src,
+    id: createId(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    folderId,
+    background: { ...src.background },
+    text: { ...src.text },
+    device: { ...src.device },
+    shots: src.shots.map((sh) => ({ ...sh, id: createId() })),
+  };
+}
+
+/**
+ * Builds the state patch for a folder copy: a fresh folder placed right after
+ * the source, plus a deep copy of every project inside it. Copies keep their
+ * source names and the source folder's order; `transformShot` lets a caller
+ * strip images or captions on the way.
+ */
+function copyFolder(
+  s: ProjectStore,
+  id: string,
+  name: string | undefined,
+  transformShot?: (shot: Shot) => Shot,
+): { folderId: string; patch: Partial<ProjectStore> } | null {
+  const src = s.folders[id];
+  if (!src) return null;
+  const folder = makeFolder(
+    uniqueName(
+      name?.trim() || `${src.name} copy`,
+      Object.values(s.folders).map((f) => f.name),
+    ),
+  );
+  // Walk projectOrder so the copies keep the source folder's order.
+  const copies = s.projectOrder
+    .map((pid) => s.projects[pid])
+    .filter((p) => p && p.folderId === id)
+    .map((p) => {
+      const copy = cloneProject(p, p.name, folder.id);
+      return transformShot
+        ? { ...copy, shots: copy.shots.map(transformShot) }
+        : copy;
+    });
+  const projects = { ...s.projects };
+  for (const c of copies) projects[c.id] = c;
+  const folderOrder = [...s.folderOrder];
+  const i = folderOrder.indexOf(id);
+  folderOrder.splice(i >= 0 ? i + 1 : folderOrder.length, 0, folder.id);
+  return {
+    folderId: folder.id,
+    patch: {
+      folders: { ...s.folders, [folder.id]: folder },
+      folderOrder,
+      projects,
+      projectOrder: [...copies.map((c) => c.id), ...s.projectOrder],
+    },
+  };
+}
+
 /** Replaces a project immutably, stamping updatedAt. */
 function withProject(
   s: ProjectStore,
@@ -124,10 +262,10 @@ export const useProjectStore = create<ProjectStore>()(
         viewMode: "grid",
 
         createProject: (name, folderId = null) => {
-          const taken = Object.values(get().projects).map((p) => p.name);
-          const target = folderId && get().folders[folderId] ? folderId : null;
+          const s = get();
+          const target = folderId && s.folders[folderId] ? folderId : null;
           const project = makeProject(
-            uniqueName(name ?? "Untitled project", taken),
+            uniqueName(name ?? "Untitled project", namesInFolder(s, target)),
             target,
           );
           set((s) => ({
@@ -141,7 +279,14 @@ export const useProjectStore = create<ProjectStore>()(
           set((s) => ({
             // Imported projects always land at the root — their `folderId`
             // (if any) refers to folders from another app instance.
-            projects: { ...s.projects, [project.id]: { ...project, folderId: null } },
+            projects: {
+              ...s.projects,
+              [project.id]: {
+                ...project,
+                name: uniqueName(project.name, namesInFolder(s, null)),
+                folderId: null,
+              },
+            },
             projectOrder: [project.id, ...s.projectOrder],
           }));
           return project.id;
@@ -162,9 +307,6 @@ export const useProjectStore = create<ProjectStore>()(
               };
             }
             // Merge: keep existing, prepend imports, uniquify names as we go.
-            const takenProjectNames = new Set(
-              Object.values(s.projects).map((p) => p.name),
-            );
             const takenFolderNames = new Set(
               Object.values(s.folders).map((f) => f.name),
             );
@@ -176,11 +318,25 @@ export const useProjectStore = create<ProjectStore>()(
               folders[f.id] = { ...f, name };
               newFolderIds.push(f.id);
             }
+            // Project names collide only within their destination folder. An
+            // imported folder is brand new and therefore empty, so a whole
+            // imported folder keeps its project names verbatim; only projects
+            // landing at the root can meet an existing sibling.
+            const takenByFolder = new Map<string | null, Set<string>>();
+            const takenIn = (folderId: string | null) => {
+              let taken = takenByFolder.get(folderId);
+              if (!taken) {
+                taken = new Set(namesInFolder(s, folderId));
+                takenByFolder.set(folderId, taken);
+              }
+              return taken;
+            };
             const projects = { ...s.projects };
             const newProjectIds: string[] = [];
             for (const p of payload.projects) {
-              const name = uniqueName(p.name, takenProjectNames);
-              takenProjectNames.add(name);
+              const taken = takenIn(p.folderId);
+              const name = uniqueName(p.name, taken);
+              taken.add(name);
               projects[p.id] = { ...p, name };
               newProjectIds.push(p.id);
             }
@@ -207,21 +363,14 @@ export const useProjectStore = create<ProjectStore>()(
           }),
 
         duplicateProject: (id) => {
-          const src = get().projects[id];
+          const s = get();
+          const src = s.projects[id];
           if (!src) return null;
-          const taken = Object.values(get().projects).map((p) => p.name);
-          const now = Date.now();
-          const copy: Project = {
-            ...src,
-            id: createId(),
-            name: uniqueName(`${src.name} copy`, taken),
-            createdAt: now,
-            updatedAt: now,
-            background: { ...src.background },
-            text: { ...src.text },
-            device: { ...src.device },
-            shots: src.shots.map((sh) => ({ ...sh, id: createId() })),
-          };
+          const copy = cloneProject(
+            src,
+            uniqueName(`${src.name} copy`, namesInFolder(s, src.folderId)),
+            src.folderId,
+          );
           set((s) => {
             const order = [...s.projectOrder];
             const i = order.indexOf(id);
@@ -266,6 +415,32 @@ export const useProjectStore = create<ProjectStore>()(
             };
           }),
 
+        duplicateFolder: (id, name) => {
+          const result = copyFolder(get(), id, name);
+          if (!result) return null;
+          set(result.patch);
+          return result.folderId;
+        },
+
+        createFolderVersion: (id, name, { keepImages, keepCaptions }) => {
+          const result = copyFolder(
+            get(),
+            id,
+            name,
+            keepImages && keepCaptions
+              ? undefined
+              : (sh) => ({
+                  ...sh,
+                  image: keepImages ? sh.image : null,
+                  claim: keepCaptions ? sh.claim : "",
+                  sub: keepCaptions ? sh.sub : "",
+                }),
+          );
+          if (!result) return null;
+          set(result.patch);
+          return result.folderId;
+        },
+
         deleteFolder: (id) =>
           set((s) => {
             if (!s.folders[id]) return s;
@@ -292,13 +467,64 @@ export const useProjectStore = create<ProjectStore>()(
             if (!p) return s;
             const target = folderId && s.folders[folderId] ? folderId : null;
             if (p.folderId === target) return s;
+            // Names are unique per folder, so a move can collide.
+            const name = uniqueName(
+              p.name,
+              namesInFolder(s, target, projectId),
+            );
             return {
               projects: {
                 ...s.projects,
-                [projectId]: { ...p, folderId: target, updatedAt: Date.now() },
+                [projectId]: {
+                  ...p,
+                  name,
+                  folderId: target,
+                  updatedAt: Date.now(),
+                },
               },
             };
           }),
+
+        applyToProjects: (sourceId, targetIds, { design, captions }) => {
+          const s = get();
+          const src = s.projects[sourceId];
+          if (!src || (!design && !captions)) return 0;
+          const targets = targetIds.filter(
+            (id) => id !== sourceId && s.projects[id],
+          );
+          if (targets.length === 0) return 0;
+
+          const now = Date.now();
+          const projects = { ...s.projects };
+          for (const id of targets) {
+            const target = projects[id];
+            const next: Project = { ...target, updatedAt: now };
+            if (design) {
+              next.background = { ...src.background };
+              next.text = { ...src.text };
+              next.device = { ...src.device };
+            }
+            if (captions) {
+              const shots = target.shots.map((sh, i) => {
+                const from = src.shots[i];
+                return from ? { ...sh, claim: from.claim, sub: from.sub } : sh;
+              });
+              // The source is the master: captions past the target's last shot
+              // get an empty placeholder to live in, ready for a screenshot.
+              for (let i = shots.length; i < src.shots.length; i++) {
+                shots.push({
+                  ...makeShot(null),
+                  claim: src.shots[i].claim,
+                  sub: src.shots[i].sub,
+                });
+              }
+              next.shots = shots;
+            }
+            projects[id] = next;
+          }
+          set({ projects });
+          return targets.length;
+        },
 
         setViewMode: (mode) => set({ viewMode: mode }),
 

@@ -46,6 +46,14 @@ export function ProjectMenu({ project }: { project: Project }) {
   const folders = useProjectStore(
     useShallow((s) => s.folderOrder.map((id) => s.folders[id]).filter(Boolean)),
   );
+  // Project names only need to be unique inside their own folder.
+  const siblingNames = useProjectStore(
+    useShallow((s) =>
+      Object.values(s.projects)
+        .filter((p) => p.folderId === project.folderId && p.id !== project.id)
+        .map((p) => p.name),
+    ),
+  );
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -161,6 +169,7 @@ export function ProjectMenu({ project }: { project: Project }) {
         onOpenChange={setRenameOpen}
         title="Rename project"
         initialName={project.name}
+        takenNames={siblingNames}
         onSubmit={(name) => renameProject(project.id, name)}
       />
 

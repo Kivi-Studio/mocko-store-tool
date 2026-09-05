@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Copy,
   Download,
   Folder as FolderIcon,
+  GitBranch,
   MoreVertical,
   Pencil,
   Trash2,
@@ -14,7 +16,7 @@ import type { Folder } from "@/lib/model/types";
 import { useShallow } from "zustand/react/shallow";
 import { useProjectStore } from "@/store/useProjectStore";
 import { exportWorkspaceFile } from "@/lib/storage/project-file";
-import { cn } from "@/lib/utils";
+import { cn, uniqueName } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteDialog, RenameDialog } from "./dialogs";
+import { NewVersionDialog } from "./NewVersionDialog";
 
 /** Shared actions menu for a folder, used by both the grid tile and list row. */
 export function FolderMenu({
@@ -36,15 +39,16 @@ export function FolderMenu({
   const router = useRouter();
   const renameFolder = useProjectStore((s) => s.renameFolder);
   const deleteFolder = useProjectStore((s) => s.deleteFolder);
-  const folderNames = useProjectStore(
-    useShallow((s) =>
-      Object.values(s.folders)
-        .filter((f) => f.id !== folder.id)
-        .map((f) => f.name),
-    ),
+  const duplicateFolder = useProjectStore((s) => s.duplicateFolder);
+  const createFolderVersion = useProjectStore((s) => s.createFolderVersion);
+  const allFolderNames = useProjectStore(
+    useShallow((s) => Object.values(s.folders).map((f) => f.name)),
   );
+  const folderNames = allFolderNames.filter((n) => n !== folder.name);
 
   const [renameOpen, setRenameOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleExport = async () => {
@@ -85,6 +89,14 @@ export function FolderMenu({
             <Pencil className="size-4" />
             Rename
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDuplicateOpen(true)}>
+            <Copy className="size-4" />
+            Duplicate…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setVersionOpen(true)}>
+            <GitBranch className="size-4" />
+            New version…
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void handleExport()}>
             <Download className="size-4" />
             Export folder (.studio)
@@ -107,6 +119,38 @@ export function FolderMenu({
         initialName={folder.name}
         takenNames={folderNames}
         onSubmit={(name) => renameFolder(folder.id, name)}
+      />
+
+      <RenameDialog
+        open={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
+        title="Duplicate folder"
+        initialName={uniqueName(`${folder.name} copy`, allFolderNames)}
+        takenNames={allFolderNames}
+        onSubmit={(name) => {
+          duplicateFolder(folder.id, name);
+          toast.success(
+            `Duplicated “${folder.name}” with ${projectCount} ${
+              projectCount === 1 ? "project" : "projects"
+            }`,
+          );
+        }}
+      />
+
+      <NewVersionDialog
+        // Remount on open so the draft re-reads the folder's current name.
+        key={versionOpen ? "open" : "closed"}
+        open={versionOpen}
+        onOpenChange={setVersionOpen}
+        folder={folder}
+        projectCount={projectCount}
+        takenNames={allFolderNames}
+        onSubmit={(name, options) => {
+          const id = createFolderVersion(folder.id, name, options);
+          if (!id) return;
+          toast.success(`Created “${name}”`);
+          router.push(`/?folder=${id}`);
+        }}
       />
 
       <ConfirmDeleteDialog
