@@ -99,6 +99,20 @@ describe("workspace round-trip", () => {
     expect(b.folderId).toBeNull();
   });
 
+  it("preserves an explicit app assignment, and omits it when unset", async () => {
+    const assigned = makeFolder("Telly Rebrand Draft");
+    assigned.appName = "Telly";
+    const plain = makeFolder("Marketing");
+
+    const payload = await readWorkspaceFile(
+      await buildWorkspaceArchive([], [assigned, plain]),
+    );
+
+    expect(payload.folders[0].appName).toBe("Telly");
+    // No override travels as no override, not as an empty string.
+    expect(payload.folders[1].appName).toBeNull();
+  });
+
   it("reads a single-project archive as one project, no folders", async () => {
     const payload = await readWorkspaceFile(
       await buildProjectArchive(sample()),

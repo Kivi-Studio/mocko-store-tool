@@ -47,6 +47,7 @@ export function NewVersionDialog({
   folder,
   projectCount,
   takenNames,
+  baseName,
   onSubmit,
 }: {
   open: boolean;
@@ -54,9 +55,17 @@ export function NewVersionDialog({
   folder: Folder;
   projectCount: number;
   takenNames: readonly string[];
+  /**
+   * App name to prefill, when it is known independently of the folder name —
+   * a folder pulled into an app via `appName` may not carry it in its own name.
+   * Defaults to the base parsed from the source folder.
+   */
+  baseName?: string;
   onSubmit: (name: string, options: FolderCopyOptions) => void;
 }) {
-  const [base, setBase] = useState(() => parseVersionedName(folder.name).base);
+  const [base, setBase] = useState(
+    () => baseName ?? parseVersionedName(folder.name).base,
+  );
   const [versionText, setVersionText] = useState(() =>
     formatVersion(suggestNextVersion(folder.name, "minor")),
   );

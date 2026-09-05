@@ -12,9 +12,12 @@ import { FolderMenu } from "./FolderMenu";
 export function FolderRow({
   folder,
   projectCount,
+  label,
 }: {
   folder: Folder;
   projectCount: number;
+  /** Overrides the displayed name — inside an app this is the version. */
+  label?: string;
 }) {
   const moveProjectToFolder = useProjectStore((s) => s.moveProjectToFolder);
   const [dragOver, setDragOver] = useState(false);
@@ -46,7 +49,7 @@ export function FolderRow({
           <FolderIcon className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{folder.name}</p>
+          <p className="truncate text-sm font-medium">{label ?? folder.name}</p>
           <p className="text-muted-foreground text-xs">
             {projectCount} {projectCount === 1 ? "project" : "projects"}
           </p>

@@ -2,11 +2,15 @@ import { describe, it, expect } from "vitest";
 import {
   FIRST_VERSION,
   bumpVersion,
+  compareVersions,
+  folderGroupKey,
   formatVersion,
   formatVersionedName,
+  groupFolders,
   parseVersion,
   parseVersionedName,
   suggestNextVersion,
+  versionLabel,
 } from "@/lib/model/version";
 
 describe("parseVersionedName", () => {
@@ -118,5 +122,126 @@ describe("round trip", () => {
       base: "Mocko",
       version: { major: 1, minor: 2, patch: 10 },
     });
+  });
+});
+
+describe("compareVersions", () => {
+  it("orders oldest first across all segments", () => {
+    const v = (major: number, minor: number, patch: number) => ({
+      major,
+      minor,
+      patch,
+    });
+    expect(compareVersions(v(1, 2, 0), v(1, 10, 0))).toBeLessThan(0);
+    expect(compareVersions(v(2, 0, 0), v(1, 9, 9))).toBeGreaterThan(0);
+    expect(compareVersions(v(1, 2, 3), v(1, 2, 3))).toBe(0);
+  });
+});
+
+describe("folderGroupKey", () => {
+  it("derives the app from the folder name", () => {
+    expect(folderGroupKey({ name: "Telly 1.3.0" })).toBe("Telly");
+  });
+
+  it("uses the whole name when there is no version", () => {
+    expect(folderGroupKey({ name: "Marketing" })).toBe("Marketing");
+  });
+
+  it("lets an explicit appName win", () => {
+    expect(folderGroupKey({ name: "Telly Rebrand", appName: "Telly" })).toBe(
+      "Telly",
+    );
+    // Blank overrides fall back to the name, they do not create an empty app.
+    expect(folderGroupKey({ name: "Telly 1.0.0", appName: "  " })).toBe(
+      "Telly",
+    );
+  });
+});
+
+describe("versionLabel", () => {
+  it("shows the version, or the name when there is none", () => {
+    expect(versionLabel({ name: "Telly 1.3.0" })).toBe("1.3.0");
+    expect(versionLabel({ name: "Marketing" })).toBe("Marketing");
+  });
+});
+
+describe("groupFolders", () => {
+  const f = (name: string, appName?: string) => ({ name, appName });
+
+  it("groups releases of one app, newest first", () => {
+    const { groups, ungrouped } = groupFolders([
+      f("Telly 1.2.0"),
+      f("Telly 1.10.0"),
+      f("Telly 1.3.0"),
+    ]);
+    expect(ungrouped).toEqual([]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].key).toBe("Telly");
+    expect(groups[0].folders.map((x) => x.name)).toEqual([
+      "Telly 1.10.0",
+      "Telly 1.3.0",
+      "Telly 1.2.0",
+    ]);
+  });
+
+  it("leaves a lone folder ungrouped rather than making a one-member app", () => {
+    const { groups, ungrouped } = groupFolders([
+      f("Telly 1.0.0"),
+      f("Marketing"),
+    ]);
+    expect(groups).toEqual([]);
+    expect(ungrouped.map((x) => x.name)).toEqual(["Telly 1.0.0", "Marketing"]);
+  });
+
+  it("keeps unrelated folders out of a group", () => {
+    const { groups, ungrouped } = groupFolders([
+      f("Telly 1.0.0"),
+      f("Telly 1.1.0"),
+      f("Marketing"),
+      f("Kivi Dice 2.0.0"),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["Telly"]);
+    expect(ungrouped.map((x) => x.name)).toEqual([
+      "Marketing",
+      "Kivi Dice 2.0.0",
+    ]);
+  });
+
+  it("pulls an off-convention folder in via appName", () => {
+    const { groups } = groupFolders([
+      f("Telly 1.1.0"),
+      f("Telly 1.0.0"),
+      f("Telly Rebrand Draft", "Telly"),
+    ]);
+    expect(groups).toHaveLength(1);
+    // Versionless members sort to the end.
+    expect(groups[0].folders.map((x) => x.name)).toEqual([
+      "Telly 1.1.0",
+      "Telly 1.0.0",
+      "Telly Rebrand Draft",
+    ]);
+  });
+
+  it("groups a versionless folder with the app it shares a base with", () => {
+    const { groups } = groupFolders([f("Telly"), f("Telly 1.0.0")]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].folders.map((x) => x.name)).toEqual([
+      "Telly 1.0.0",
+      "Telly",
+    ]);
+  });
+
+  it("keeps groups in the order their first member appeared", () => {
+    const { groups } = groupFolders([
+      f("Kivi 1.0.0"),
+      f("Telly 1.0.0"),
+      f("Kivi 1.1.0"),
+      f("Telly 1.1.0"),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["Kivi", "Telly"]);
+  });
+
+  it("handles an empty list", () => {
+    expect(groupFolders([])).toEqual({ groups: [], ungrouped: [] });
   });
 });

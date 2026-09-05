@@ -218,6 +218,25 @@ describe("folders", () => {
     expect(store().projects[moved].folderId).toBe(f);
   });
 
+  it("assigns a folder to an app and back to name-derived grouping", () => {
+    const f = store().createFolder("Telly Rebrand Draft");
+    expect(store().folders[f].appName).toBeNull();
+
+    store().setFolderApp(f, "  Telly  ");
+    expect(store().folders[f].appName).toBe("Telly");
+    // The folder name itself is never touched.
+    expect(store().folders[f].name).toBe("Telly Rebrand Draft");
+
+    store().setFolderApp(f, "   ");
+    expect(store().folders[f].appName).toBeNull();
+  });
+
+  it("ignores an app assignment for an unknown folder", () => {
+    const before = store().folders;
+    store().setFolderApp("nope", "Telly");
+    expect(store().folders).toBe(before);
+  });
+
   it("renames a folder", () => {
     const f = store().createFolder("Old");
     store().renameFolder(f, "New");

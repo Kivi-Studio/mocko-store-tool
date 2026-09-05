@@ -88,7 +88,12 @@ type ManifestProject = {
   shots: ManifestShot[];
 };
 
-type ManifestFolder = { name: string; ref: string };
+type ManifestFolder = {
+  name: string;
+  ref: string;
+  /** Explicit app membership; omitted when the folder groups by its name. */
+  appName?: string;
+};
 
 type Manifest = {
   format: string;
@@ -201,6 +206,9 @@ export async function buildWorkspaceArchive(
   const manifestFolders: ManifestFolder[] = folders.map((f, i) => ({
     name: f.name,
     ref: `f${i}`,
+    // Optional in both directions: an older reader ignores it, and a folder
+    // without an override simply omits the key.
+    ...(f.appName ? { appName: f.appName } : {}),
   }));
   const idToRef = new Map(folders.map((f, i) => [f.id, `f${i}`]));
 
@@ -503,6 +511,9 @@ export async function readWorkspaceFile(file: Blob): Promise<WorkspacePayload> {
     const name =
       typeof rf.name === "string" && rf.name.trim() ? rf.name : "Folder";
     const folder = makeFolder(name.slice(0, CAPTION_MAX_LENGTH));
+    if (typeof rf.appName === "string" && rf.appName.trim()) {
+      folder.appName = rf.appName.trim().slice(0, CAPTION_MAX_LENGTH);
+    }
     folders.push(folder);
     if (typeof rf.ref === "string") refToId.set(rf.ref, folder.id);
   }

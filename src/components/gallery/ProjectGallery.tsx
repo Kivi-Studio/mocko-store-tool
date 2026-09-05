@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import {
   Archive,
   CheckSquare,
@@ -10,6 +9,7 @@ import {
   Download,
   FilePlus2,
   FolderPlus,
+  GitBranch,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
   type WorkspacePayload,
 } from "@/lib/storage/project-file";
 import { APP_VERSION } from "@/lib/version";
+import { groupFolders, versionLabel } from "@/lib/model/version";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,14 +34,20 @@ import { ProjectCard } from "./ProjectCard";
 import { ProjectRow } from "./ProjectRow";
 import { FolderCard } from "./FolderCard";
 import { FolderRow } from "./FolderRow";
+import { AppCard } from "./AppCard";
+import { AppRow } from "./AppRow";
+import { GalleryBreadcrumb } from "./GalleryBreadcrumb";
 import { ViewToggle } from "./ViewToggle";
 import { SelectionBar } from "./SelectionBar";
 import { ConfirmDeleteDialog, RenameDialog } from "./dialogs";
 import { ImportChoiceDialog } from "./ImportDialog";
+import { NewVersionDialog } from "./NewVersionDialog";
 
 export function ProjectGallery() {
   const router = useRouter();
-  const folderParam = useSearchParams().get("folder");
+  const params = useSearchParams();
+  const folderParam = params.get("folder");
+  const appParam = params.get("app");
 
   const projects = useProjectStore((s) => s.projects);
   const projectOrder = useProjectStore((s) => s.projectOrder);
@@ -53,6 +60,7 @@ export function ProjectGallery() {
   const importWorkspace = useProjectStore((s) => s.importWorkspace);
   const moveProjectToFolder = useProjectStore((s) => s.moveProjectToFolder);
   const deleteProject = useProjectStore((s) => s.deleteProject);
+  const createFolderVersion = useProjectStore((s) => s.createFolderVersion);
 
   const hydrated = useHydrated();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -63,6 +71,7 @@ export function ProjectGallery() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [newVersionOpen, setNewVersionOpen] = useState(false);
 
   // An unknown/deleted folder id falls back to the root view.
   const activeFolder = folderParam ? folders[folderParam] : undefined;
@@ -80,12 +89,37 @@ export function ProjectGallery() {
   const projectItems = projectOrder
     .map((id) => projects[id])
     .filter((p) => p && p.folderId === currentFolderId);
-  const folderItems =
-    currentFolderId === null
-      ? folderOrder.map((id) => folders[id]).filter(Boolean)
-      : [];
 
-  const folderList = folderOrder.map((id) => folders[id]).filter(Boolean);
+  const folderList = useMemo(
+    () => folderOrder.map((id) => folders[id]).filter(Boolean),
+    [folderOrder, folders],
+  );
+  // Releases of one app collapse into a single tile, so the root does not grow
+  // by one card per version. Folders that share no app stay as they are.
+  const { groups, ungrouped } = useMemo(
+    () => groupFolders(folderList),
+    [folderList],
+  );
+
+  // An `?app=` that no longer matches a group (its releases were deleted or
+  // renamed) falls back to the root, like an unknown folder id does.
+  const activeApp =
+    !activeFolder && appParam
+      ? (groups.find((g) => g.key === appParam) ?? null)
+      : null;
+  // The app the open folder belongs to, for the breadcrumb's version picker.
+  const folderApp = activeFolder
+    ? (groups.find((g) => g.folders.some((f) => f.id === activeFolder.id)) ??
+      null)
+    : null;
+
+  // At the root only loose folders are listed; inside an app, its releases.
+  const folderItems = activeFolder
+    ? []
+    : activeApp
+      ? activeApp.folders
+      : ungrouped;
+
   const projectsInFolder = (id: string) =>
     projectOrder
       .map((pid) => projects[pid])
@@ -194,7 +228,11 @@ export function ProjectGallery() {
     clearSelection();
   };
 
-  const isEmpty = folderItems.length === 0 && projectItems.length === 0;
+  const appItems = activeFolder || activeApp ? [] : groups;
+  const isEmpty =
+    folderItems.length === 0 &&
+    projectItems.length === 0 &&
+    appItems.length === 0;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
@@ -246,43 +284,45 @@ export function ProjectGallery() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            variant="outline"
-            onClick={() => setNewFolderOpen(true)}
-            disabled={!hydrated}
-          >
-            <FolderPlus className="size-4" />
-            New folder
-          </Button>
-          {/* Disabled until hydration: a project created before the persisted
-              state arrives would be overwritten by it. */}
-          <Button onClick={handleCreate} disabled={!hydrated}>
-            <FilePlus2 className="size-4" />
-            New project
-          </Button>
+          {/* An app lists releases, not projects — so its primary action is
+              cutting the next release, not adding a loose project that would
+              land at the root and not even show up here. */}
+          {activeApp ? (
+            <Button
+              onClick={() => setNewVersionOpen(true)}
+              disabled={!hydrated}
+            >
+              <GitBranch className="size-4" />
+              New version
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setNewFolderOpen(true)}
+                disabled={!hydrated}
+              >
+                <FolderPlus className="size-4" />
+                New folder
+              </Button>
+              {/* Disabled until hydration: a project created before the
+                  persisted state arrives would be overwritten by it. */}
+              <Button onClick={handleCreate} disabled={!hydrated}>
+                <FilePlus2 className="size-4" />
+                New project
+              </Button>
+            </>
+          )}
         </div>
       </header>
 
       {/* Breadcrumb + select + view toggle */}
       <div className="mb-6 flex min-h-9 items-center justify-between gap-4">
-        <nav className="text-muted-foreground flex items-center gap-1.5 text-sm">
-          {activeFolder ? (
-            <>
-              <Link
-                href="/"
-                className="hover:text-foreground rounded px-1 py-0.5 transition-colors"
-              >
-                All projects
-              </Link>
-              <span className="opacity-50">/</span>
-              <span className="text-foreground font-medium">
-                {activeFolder.name}
-              </span>
-            </>
-          ) : (
-            <span className="text-foreground font-medium">All projects</span>
-          )}
-        </nav>
+        <GalleryBreadcrumb
+          app={activeApp?.key ?? folderApp?.key ?? null}
+          folder={activeFolder ?? null}
+          versions={folderApp?.folders ?? []}
+        />
         {hydrated && (
           <div className="flex items-center gap-2">
             {projectItems.length > 0 && (
@@ -321,15 +361,34 @@ export function ProjectGallery() {
           <span className="text-sm font-medium">
             {activeFolder
               ? "This folder is empty — add a project"
-              : "Create your first project"}
+              : activeApp
+                ? "This app has no releases left"
+                : "Create your first project"}
           </span>
         </button>
       ) : viewMode === "grid" ? (
         <div className="space-y-8">
+          {appItems.length > 0 && (
+            <section>
+              <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+                Apps
+              </h2>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {appItems.map((g) => (
+                  <AppCard
+                    key={g.key}
+                    appKey={g.key}
+                    folders={g.folders}
+                    latestProjects={projectsInFolder(g.folders[0].id)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           {folderItems.length > 0 && (
             <section>
               <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
-                Folders
+                {activeApp ? "Versions" : "Folders"}
               </h2>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {folderItems.map((f) => (
@@ -337,6 +396,7 @@ export function ProjectGallery() {
                     key={f.id}
                     folder={f}
                     projects={projectsInFolder(f.id)}
+                    label={activeApp ? versionLabel(f) : undefined}
                   />
                 ))}
               </div>
@@ -344,7 +404,7 @@ export function ProjectGallery() {
           )}
           {projectItems.length > 0 && (
             <section>
-              {folderItems.length > 0 && (
+              {(folderItems.length > 0 || appItems.length > 0) && (
                 <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
                   Projects
                 </h2>
@@ -367,11 +427,20 @@ export function ProjectGallery() {
         </div>
       ) : (
         <div className="divide-y overflow-hidden rounded-xl border">
+          {appItems.map((g) => (
+            <AppRow
+              key={g.key}
+              appKey={g.key}
+              folders={g.folders}
+              latestProjectCount={projectsInFolder(g.folders[0].id).length}
+            />
+          ))}
           {folderItems.map((f) => (
             <FolderRow
               key={f.id}
               folder={f}
               projectCount={projectsInFolder(f.id).length}
+              label={activeApp ? versionLabel(f) : undefined}
             />
           ))}
           {projectItems.map((p) => (
@@ -421,6 +490,29 @@ export function ProjectGallery() {
         takenNames={Object.values(folders).map((f) => f.name)}
         onSubmit={(name) => createFolder(name)}
       />
+
+      {activeApp && (
+        <NewVersionDialog
+          // Remount on open so the draft re-reads the newest release.
+          key={newVersionOpen ? "open" : "closed"}
+          open={newVersionOpen}
+          onOpenChange={setNewVersionOpen}
+          folder={activeApp.folders[0]}
+          projectCount={projectsInFolder(activeApp.folders[0].id).length}
+          takenNames={folderList.map((f) => f.name)}
+          baseName={activeApp.key}
+          onSubmit={(name, options) => {
+            const id = createFolderVersion(
+              activeApp.folders[0].id,
+              name,
+              options,
+            );
+            if (!id) return;
+            toast.success(`Created “${name}”`);
+            router.push(`/?folder=${id}`);
+          }}
+        />
+      )}
 
       <ImportChoiceDialog
         open={pendingImport !== null}

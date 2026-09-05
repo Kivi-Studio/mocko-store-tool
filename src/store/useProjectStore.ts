@@ -103,6 +103,12 @@ export type ProjectStore = {
     name: string,
     options: FolderCopyOptions,
   ) => string | null;
+  /**
+   * Assigns a folder to an app explicitly, overriding the grouping derived from
+   * its name; `null` restores the name-derived grouping. Folder names are left
+   * alone — this only changes which app a folder is filed under.
+   */
+  setFolderApp: (id: string, appName: string | null) => void;
   /** Deletes a folder; its projects fall back to the root, they are not removed. */
   deleteFolder: (id: string) => void;
   /** Moves a project into a folder, or to the root with `null`. */
@@ -440,6 +446,20 @@ export const useProjectStore = create<ProjectStore>()(
           set(result.patch);
           return result.folderId;
         },
+
+        setFolderApp: (id, appName) =>
+          set((s) => {
+            const f = s.folders[id];
+            if (!f) return s;
+            const next = appName?.trim() || null;
+            if ((f.appName ?? null) === next) return s;
+            return {
+              folders: {
+                ...s.folders,
+                [id]: { ...f, appName: next, updatedAt: Date.now() },
+              },
+            };
+          }),
 
         deleteFolder: (id) =>
           set((s) => {

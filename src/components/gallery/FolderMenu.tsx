@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Boxes,
   Copy,
   Download,
   Folder as FolderIcon,
@@ -27,6 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteDialog, RenameDialog } from "./dialogs";
 import { NewVersionDialog } from "./NewVersionDialog";
+import { AssignAppDialog } from "./AssignAppDialog";
+import { folderGroupKey } from "@/lib/model/version";
 
 /** Shared actions menu for a folder, used by both the grid tile and list row. */
 export function FolderMenu({
@@ -41,6 +44,19 @@ export function FolderMenu({
   const deleteFolder = useProjectStore((s) => s.deleteFolder);
   const duplicateFolder = useProjectStore((s) => s.duplicateFolder);
   const createFolderVersion = useProjectStore((s) => s.createFolderVersion);
+  const setFolderApp = useProjectStore((s) => s.setFolderApp);
+  // Apps that already exist, offered as suggestions when filing this folder.
+  const appNames = useProjectStore(
+    useShallow((s) =>
+      [
+        ...new Set(
+          Object.values(s.folders)
+            .filter((f) => f.id !== folder.id)
+            .map(folderGroupKey),
+        ),
+      ].sort(),
+    ),
+  );
   const allFolderNames = useProjectStore(
     useShallow((s) => Object.values(s.folders).map((f) => f.name)),
   );
@@ -49,6 +65,7 @@ export function FolderMenu({
   const [renameOpen, setRenameOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleExport = async () => {
@@ -96,6 +113,10 @@ export function FolderMenu({
           <DropdownMenuItem onClick={() => setVersionOpen(true)}>
             <GitBranch className="size-4" />
             New version…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setAssignOpen(true)}>
+            <Boxes className="size-4" />
+            Assign to app…
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void handleExport()}>
             <Download className="size-4" />
@@ -150,6 +171,23 @@ export function FolderMenu({
           if (!id) return;
           toast.success(`Created “${name}”`);
           router.push(`/?folder=${id}`);
+        }}
+      />
+
+      <AssignAppDialog
+        // Remount on open so the draft reflects the folder's current app.
+        key={assignOpen ? "open" : "closed"}
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        folder={folder}
+        appNames={appNames}
+        onSubmit={(appName) => {
+          setFolderApp(folder.id, appName);
+          toast.success(
+            appName
+              ? `“${folder.name}” filed under “${appName}”`
+              : `“${folder.name}” groups by its name again`,
+          );
         }}
       />
 

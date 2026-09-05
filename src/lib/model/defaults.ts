@@ -72,5 +72,6 @@ export function makeFolder(name: string): Folder {
     name,
     createdAt: now,
     updatedAt: now,
+    appName: null,
   };
 }

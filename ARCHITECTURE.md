@@ -70,7 +70,7 @@ bzw. Wertebereiche. Sie schützen sowohl den Editor als auch den Import fremder
 `.studio`-Dateien davor, unerlaubte Werte in inline-CSS oder den Canvas zu
 schleusen (z. B. `url(...)`-Injection über einen Farbstring).
 
-## Releases: Ordner als Version
+## Apps & Releases
 
 Ein Ordner bündelt die Varianten _eines_ Releases — dieselbe App je Store,
 Geräteklasse und Sprache (`iPhone (de)`, `iPad (de)`, `Play (en)` …). Daraus
@@ -85,6 +85,14 @@ folgen drei Regeln:
 - **`applyToProjects`** überträgt Design und/oder Captions von einer Variante
   auf ihre Geschwister. Preset und Screenshots bleiben unangetastet — genau
   sie machen eine Variante zur Variante.
+
+Über den Ordnern liegt eine **reine Ansichtsebene**, kein Modellkonstrukt:
+`groupFolders` fasst Ordner mit gleichem Schlüssel (`appName ?? geparste Basis`)
+zu einer App zusammen, ab zwei Mitgliedern. Ordner ohne Version haben ihren
+vollen Namen als Schlüssel und gruppieren daher nie versehentlich; `appName`
+ist die Ausnahme für Ordner, deren Name die Konvention nicht trägt. Die Galerie
+kennt damit drei Ebenen — Wurzel → App (`?app=`) → Release (`?folder=`) —
+ohne dass ein Ordner je einen Ordner enthält.
 
 ## State & Persistenz
 

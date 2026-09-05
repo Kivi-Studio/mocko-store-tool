@@ -137,6 +137,14 @@ export type Folder = {
   name: string;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Explicit app membership, overriding the one derived from the folder name.
+   * Normally a release folder groups under the base of its name — "Telly 1.3.0"
+   * belongs to "Telly" — and this stays `null`. Set it to pull a folder whose
+   * name does not follow that convention into an app anyway. Absent on folders
+   * created before apps existed, hence optional.
+   */
+  appName?: string | null;
 };
 
 /** How the gallery lists folders and projects. */

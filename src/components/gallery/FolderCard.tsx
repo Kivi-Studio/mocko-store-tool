@@ -16,9 +16,12 @@ import { FolderMenu } from "./FolderMenu";
 export function FolderCard({
   folder,
   projects,
+  label,
 }: {
   folder: Folder;
   projects: Project[];
+  /** Overrides the displayed name — inside an app this is the version. */
+  label?: string;
 }) {
   const moveProjectToFolder = useProjectStore((s) => s.moveProjectToFolder);
   const [dragOver, setDragOver] = useState(false);
@@ -84,7 +87,9 @@ export function FolderCard({
         <div className="flex min-w-0 items-center gap-2">
           <FolderIcon className="text-muted-foreground size-4 shrink-0" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{folder.name}</p>
+            <p className="truncate text-sm font-medium">
+              {label ?? folder.name}
+            </p>
             <p className="text-muted-foreground text-xs">
               {count} {count === 1 ? "project" : "projects"}
             </p>
