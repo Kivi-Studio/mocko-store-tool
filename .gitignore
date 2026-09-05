@@ -25,6 +25,9 @@
 .DS_Store
 *.pem
 
+# local .studio backups (user data, sometimes dropped in for debugging)
+*.studio
+
 # throwaway design/HTML prototypes — kept locally, never committed
 /prototypes/
 
