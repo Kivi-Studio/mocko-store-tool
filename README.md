@@ -18,6 +18,9 @@ lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
 - **Releases versionieren:** Ordner duplizieren oder per **„Neue Version…"**
   unter `<App> X.Y.Z` kopieren — auf Wunsch mit geleerten Screenshots, wobei
   Anzahl, Captions und Layout erhalten bleiben.
+- **Caption-Ansicht je Release:** alle Texte eines Ordners als Raster —
+  Zeilen sind Shot-Positionen, Spalten die Projekte —, direkt editierbar,
+  statt sich durch jedes Projekt einzeln zu klicken.
 - **Auf Geschwister übertragen:** Design und/oder Captions von einer fertigen
   Variante auf die anderen Projekte im Ordner anwenden, ohne Preset und
   Screenshots anzufassen.
@@ -119,8 +122,10 @@ src/
   app/                 # Next.js App Router
     page.tsx           # /         – Galerie (Ordner & Projekte)
     project/           # /project  – Editor, Projekt-Id als ?id=…
+    captions/          # /captions – Texte eines Releases, Ordner-Id als ?folder=…
     manifest.ts        # PWA-Manifest
   components/
+    captions/          # Caption-Raster über ein ganzes Release
     editor/            # Canvas, Sidebar, Topbar, Shot-Karten
     gallery/           # Ordner- & Projektkarten, Dialoge, Mehrfachauswahl
     ui/                # wiederverwendbare UI-Primitives

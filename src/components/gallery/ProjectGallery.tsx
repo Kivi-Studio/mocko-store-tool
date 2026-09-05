@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Archive,
   CheckSquare,
@@ -10,6 +11,7 @@ import {
   FilePlus2,
   FolderPlus,
   GitBranch,
+  Table2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -325,6 +327,19 @@ export function ProjectGallery() {
         />
         {hydrated && (
           <div className="flex items-center gap-2">
+            {/* A release's copy is written once and repeated across its
+                variants, so editing it project by project is the slow part. */}
+            {activeFolder && projectItems.length > 0 && (
+              <Link
+                href={`/captions/?folder=${activeFolder.id}`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                )}
+              >
+                <Table2 className="size-4" />
+                Captions
+              </Link>
+            )}
             {projectItems.length > 0 && (
               <Button
                 variant={selectMode ? "secondary" : "outline"}

@@ -15,9 +15,11 @@ src/
 │   ├── layout.tsx, page.tsx          Root-Layout + Startseite (Galerie)
 │   ├── error.tsx, global-error.tsx, not-found.tsx
 │   ├── manifest.ts, globals.css
-│   └── project/{layout,page}.tsx      Editor (Projekt-Id als ?id=…)
+│   ├── project/{layout,page}.tsx      Editor (Projekt-Id als ?id=…)
+│   └── captions/{layout,page}.tsx     Caption-Raster (Ordner-Id als ?folder=…)
 │
 ├── components/     Präsentation (React)
+│   ├── captions/   Feature „Alle Texte eines Releases"
 │   ├── editor/     Feature „Editor": Canvas, Sidebar, Topbar, Shots …
 │   ├── gallery/    Feature „Projektübersicht"
 │   └── ui/         wiederverwendbare Primitives (shadcn/ui)
