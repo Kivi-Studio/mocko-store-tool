@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import type { Project } from "@/lib/model/types";
 import { exportShot } from "@/lib/render/export";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/model/limits";
-import { fileToDataUrl } from "@/lib/storage/upload";
+import { fileToImageId } from "@/lib/storage/upload";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import { ShotPreview } from "./ShotPreview";
@@ -61,8 +61,8 @@ export function ShotCard({
 
   const handleImageFile = async (file: File) => {
     try {
-      const dataUrl = await fileToDataUrl(file);
-      setShotImage(project.id, shot.id, dataUrl);
+      const imageId = await fileToImageId(file);
+      setShotImage(project.id, shot.id, imageId);
     } catch {
       toast.error("Image skipped (unsupported type or too large)");
     }
@@ -136,7 +136,7 @@ export function ShotCard({
         className="border-input text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors"
       >
         <ImageIcon className="size-4" />
-        {shot.image ? "Replace image" : "Choose image"}
+        {shot.imageId ? "Replace image" : "Choose image"}
       </button>
       <Input
         value={shot.claim}

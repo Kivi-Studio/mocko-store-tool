@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Project, Shot } from "@/lib/model/types";
 import { getPreset } from "@/lib/model/presets";
 import { drawShot } from "@/lib/render/render";
-import { loadImageOrNull } from "@/lib/render/image";
+import { loadImageById } from "@/lib/render/image";
 
 /**
  * Renders one shot to a full-resolution canvas that is scaled down with CSS.
@@ -23,15 +23,15 @@ export function ShotCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const preset = getPreset(project.presetId);
   const { background, text, device } = project;
-  const bgImage = background.type === "image" ? background.image : null;
+  const bgImageId = background.type === "image" ? background.imageId : null;
   const { claim, sub } = shot;
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const [screenshot, backgroundImage] = await Promise.all([
-        loadImageOrNull(shot.image),
-        loadImageOrNull(bgImage),
+        loadImageById(shot.imageId),
+        loadImageById(bgImageId),
       ]);
       if (cancelled || !canvasRef.current) return;
       drawShot(canvasRef.current, {
@@ -56,8 +56,8 @@ export function ShotCanvas({
     background,
     text,
     device,
-    bgImage,
-    shot.image,
+    bgImageId,
+    shot.imageId,
     claim,
     sub,
     shot.offX,

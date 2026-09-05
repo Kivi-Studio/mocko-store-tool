@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import type { Project, Shot } from "@/lib/model/types";
 import { getPreset } from "@/lib/model/presets";
 import { drawShot } from "@/lib/render/render";
-import { loadImageOrNull } from "@/lib/render/image";
+import { loadImageById } from "@/lib/render/image";
 import { slugify } from "@/lib/utils";
 
 const JPEG_QUALITY = 0.95;
@@ -35,9 +35,9 @@ export async function renderShotToBlob(
   const preset = getPreset(project.presetId);
   const { claim, sub } = shot;
   const [screenshot, backgroundImage] = await Promise.all([
-    loadImageOrNull(shot.image),
-    loadImageOrNull(
-      project.background.type === "image" ? project.background.image : null,
+    loadImageById(shot.imageId),
+    loadImageById(
+      project.background.type === "image" ? project.background.imageId : null,
     ),
   ]);
 

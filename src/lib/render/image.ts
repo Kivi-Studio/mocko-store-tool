@@ -1,8 +1,9 @@
 /**
- * Decodes image data URLs into `HTMLImageElement`s, cached by source so the
- * same screenshot isn't decoded once per preview render. Used by the live
- * canvas preview and by export.
+ * Decodes images into `HTMLImageElement`s, cached by source so the same
+ * screenshot isn't decoded once per preview render. Used by the live canvas
+ * preview and by export.
  */
+import { getImageUrl } from "@/lib/storage/image-store";
 const cache = new Map<string, Promise<HTMLImageElement>>();
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
@@ -28,4 +29,17 @@ export async function loadImageOrNull(
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolves a content id from the image store and decodes it. Returns null for
+ * an empty id, and for one whose bytes are gone — a missing image renders as
+ * an empty placeholder rather than failing the whole canvas.
+ */
+export async function loadImageById(
+  id: string | null,
+): Promise<HTMLImageElement | null> {
+  if (!id) return null;
+  const url = await getImageUrl(id);
+  return loadImageOrNull(url);
 }

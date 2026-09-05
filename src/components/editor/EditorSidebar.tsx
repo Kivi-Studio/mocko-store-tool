@@ -24,7 +24,7 @@ import {
   TOP_SPACE_MAX,
   TOP_SPACE_MIN,
 } from "@/lib/model/limits";
-import { fileToDataUrl } from "@/lib/storage/upload";
+import { fileToImageId } from "@/lib/storage/upload";
 import { exportProjectFile, readProjectFile } from "@/lib/storage/project-file";
 import { APP_VERSION } from "@/lib/version";
 import { useProjectStore } from "@/store/useProjectStore";
@@ -84,8 +84,8 @@ export function EditorSidebar({ project }: { project: Project }) {
   const handleBgImage = async (file?: File) => {
     if (!file) return;
     try {
-      const image = await fileToDataUrl(file);
-      setBackground({ type: "image", image });
+      const imageId = await fileToImageId(file);
+      setBackground({ type: "image", imageId });
     } catch (error) {
       console.error(error);
       toast.error("Could not load background image");
@@ -166,7 +166,7 @@ export function EditorSidebar({ project }: { project: Project }) {
               });
             else if (type === "solid")
               setBackground({ type: "solid", color: "#4A6BFF" });
-            else setBackground({ type: "image", image: null });
+            else setBackground({ type: "image", imageId: null });
           }}
         />
 
@@ -227,7 +227,7 @@ export function EditorSidebar({ project }: { project: Project }) {
               onClick={() => bgFileRef.current?.click()}
             >
               <ImagePlus className="size-4" />
-              {bg.image ? "Replace image" : "Choose image"}
+              {bg.imageId ? "Replace image" : "Choose image"}
             </Button>
           </div>
         )}

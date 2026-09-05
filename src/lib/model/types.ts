@@ -3,7 +3,7 @@
  *
  * The model is intentionally flat: a Project holds one set of global styling
  * (preset/format, background, text, device) plus an ordered list of shots
- * (uploaded screenshots with a per-shot caption). Every shot shares the same
+ * (screenshots referenced by content id, with a per-shot caption). Every shot shares the same
  * global styling, which keeps a store listing visually consistent — the only
  * per-shot overrides are the device's position and (optionally) its size.
  *
@@ -50,8 +50,8 @@ export type GradientBackground = {
 
 export type ImageBackground = {
   type: "image";
-  /** Background image as a data URL, or null when none chosen yet. */
-  image: string | null;
+  /** Content id of the background image (see `storage/image-store`), or null. */
+  imageId: string | null;
 };
 
 export type Background = SolidBackground | GradientBackground | ImageBackground;
@@ -88,8 +88,13 @@ export type DeviceStyle = {
 /** A single uploaded screenshot with its caption. */
 export type Shot = {
   id: string;
-  /** The screenshot as a data URL, or null for the empty placeholder. */
-  image: string | null;
+  /**
+   * Content id of the screenshot in the image store, or null for the empty
+   * placeholder. The bytes live outside the persisted state so that keeping
+   * many releases neither bloats every autosave nor stores the same unchanged
+   * screenshot once per version — see `storage/image-store`.
+   */
+  imageId: string | null;
   /** Headline shown above the device. */
   claim: string;
   /** Optional supporting line shown under the claim. */

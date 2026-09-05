@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { filesToDataUrls } from "@/lib/storage/upload";
+import { filesToImageIds } from "@/lib/storage/upload";
 import { useProjectStore } from "@/store/useProjectStore";
 
 /**
@@ -13,8 +13,8 @@ export function useAddShots(projectId: string) {
   const addShots = useProjectStore((s) => s.addShots);
   return useCallback(
     async (files: Iterable<File>) => {
-      const { images, failed } = await filesToDataUrls(files);
-      if (images.length) addShots(projectId, images);
+      const { imageIds, failed } = await filesToImageIds(files);
+      if (imageIds.length) addShots(projectId, imageIds);
       if (failed) {
         toast.error(
           `${failed} file${failed > 1 ? "s" : ""} skipped (unsupported type or too large)`,

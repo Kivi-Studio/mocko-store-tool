@@ -17,7 +17,17 @@ import type {
   ViewMode,
 } from "@/lib/model/types";
 import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
-import { createIdbStorage, onExternalWrite } from "@/lib/storage/idb-storage";
+import {
+  backupLegacyState,
+  createIdbStorage,
+  discardLegacyBackup,
+  onExternalWrite,
+} from "@/lib/storage/idb-storage";
+import { sweep } from "@/lib/storage/image-store";
+import {
+  migrateProjectToImageStore,
+  referencedImageIds,
+} from "@/lib/storage/migrate-images";
 import { createId, uniqueName } from "@/lib/utils";
 
 /** Reorder direction: one step towards the front (-1) or the back (1). */
@@ -129,14 +139,14 @@ export type ProjectStore = {
   setViewMode: (mode: ViewMode) => void;
 
   patchSettings: (id: string, patch: SettingsPatch) => void;
-  addShots: (id: string, images: string[]) => void;
+  addShots: (id: string, imageIds: string[]) => void;
   /** Appends an image-less shot that can be filled in later. */
   addEmptyShot: (id: string) => void;
   /** Sets or replaces (or clears, with null) a single shot's image. */
   setShotImage: (
     projectId: string,
     shotId: string,
-    image: string | null,
+    imageId: string | null,
   ) => void;
   /** Patches a single shot's caption text (claim / subtext). */
   updateShotText: (
@@ -240,6 +250,13 @@ function copyFolder(
     },
   };
 }
+
+/**
+ * True when this session ran the image-store migration. The pre-migration
+ * backup is then kept until the *next* session loads the new shape cleanly —
+ * proof that the migrated state was written and reads back.
+ */
+let migratedThisSession = false;
 
 /** Replaces a project immutably, stamping updatedAt. */
 function withProject(
@@ -437,7 +454,7 @@ export const useProjectStore = create<ProjectStore>()(
               ? undefined
               : (sh) => ({
                   ...sh,
-                  image: keepImages ? sh.image : null,
+                  imageId: keepImages ? sh.imageId : null,
                   claim: keepCaptions ? sh.claim : "",
                   sub: keepCaptions ? sh.sub : "",
                 }),
@@ -551,11 +568,11 @@ export const useProjectStore = create<ProjectStore>()(
         patchSettings: (id, patch) =>
           set((s) => withProject(s, id, (p) => ({ ...p, ...patch }))),
 
-        addShots: (id, images) =>
+        addShots: (id, imageIds) =>
           set((s) =>
             withProject(s, id, (p) => ({
               ...p,
-              shots: [...p.shots, ...images.map((img) => makeShot(img))],
+              shots: [...p.shots, ...imageIds.map((i) => makeShot(i))],
             })),
           ),
 
@@ -567,12 +584,12 @@ export const useProjectStore = create<ProjectStore>()(
             })),
           ),
 
-        setShotImage: (projectId, shotId, image) =>
+        setShotImage: (projectId, shotId, imageId) =>
           set((s) =>
             withProject(s, projectId, (p) => ({
               ...p,
               shots: p.shots.map((sh) =>
-                sh.id === shotId ? { ...sh, image } : sh,
+                sh.id === shotId ? { ...sh, imageId } : sh,
               ),
             })),
           ),
@@ -637,34 +654,48 @@ export const useProjectStore = create<ProjectStore>()(
       }),
       {
         name: "screenshot-studio",
-        // v5 added folders and a per-project folderId. That change is purely
-        // additive, so v4 state is migrated in place (existing projects are
-        // kept, just given `folderId: null`). Anything older than v4 predates
-        // the current shot shape and is discarded (the app is pre-release).
-        version: 5,
-        migrate: (persisted, version) => {
+        // v6 moved screenshots out of the state and into the content-addressed
+        // image store; v5 had added folders and a per-project folderId. Both
+        // v4 and v5 migrate in place — no project is ever discarded. Anything
+        // older predates the current shot shape and is dropped (pre-release).
+        version: 6,
+        migrate: async (persisted, version) => {
           const empty = {
             projects: {},
             projectOrder: [],
             folders: {},
             folderOrder: [],
           };
-          if (version !== 4 || !persisted || typeof persisted !== "object") {
+          if (
+            (version !== 4 && version !== 5) ||
+            !persisted ||
+            typeof persisted !== "object"
+          ) {
             return empty;
           }
           const s = persisted as {
-            projects?: Record<string, Project>;
+            projects?: Record<string, unknown>;
             projectOrder?: string[];
+            folders?: Record<string, Folder>;
+            folderOrder?: string[];
           };
+
+          // Park the untouched original first. Moving every screenshot in the
+          // library is the one write that could lose data, so the old state
+          // stays recoverable until a later session proves the new one loads.
+          await backupLegacyState(persisted);
+
           const projects: Record<string, Project> = {};
-          for (const [id, p] of Object.entries(s.projects ?? {})) {
-            projects[id] = { ...p, folderId: p.folderId ?? null };
+          for (const [id, raw] of Object.entries(s.projects ?? {})) {
+            projects[id] = await migrateProjectToImageStore(raw);
           }
+          migratedThisSession = true;
           return {
             projects,
             projectOrder: s.projectOrder ?? Object.keys(projects),
-            folders: {},
-            folderOrder: [],
+            // v4 predates folders entirely.
+            folders: version === 5 ? (s.folders ?? {}) : {},
+            folderOrder: version === 5 ? (s.folderOrder ?? []) : [],
           };
         },
         storage: createIdbStorage(),
@@ -699,8 +730,21 @@ export const useProjectStore = create<ProjectStore>()(
 
 if (typeof window !== "undefined") {
   // IndexedDB rehydration must not become an undoable step.
-  useProjectStore.persist.onFinishHydration(() => {
+  useProjectStore.persist.onFinishHydration((state) => {
     useProjectStore.temporal.getState().clear();
+
+    // A session that did not migrate has loaded the current shape from disk —
+    // the pre-migration backup has served its purpose.
+    if (!migratedThisSession) void discardLegacyBackup();
+
+    // Drop images nothing points at any more: deleting a release only removes
+    // its projects, and an image may still be shared with another release.
+    // Skipped on an empty state — that is far more likely to be a failed load
+    // than a genuinely empty library, and sweeping it would delete everything.
+    const projects = state?.projects ?? {};
+    if (Object.keys(projects).length > 0) {
+      void sweep(referencedImageIds(projects));
+    }
   });
   // Rehydrate when another tab writes so tabs don't clobber each other.
   onExternalWrite(() => void useProjectStore.persist.rehydrate());

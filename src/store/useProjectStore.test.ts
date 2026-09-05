@@ -77,7 +77,7 @@ describe("shots & captions", () => {
     store().addShots(id, ["a", "b", "c"]);
     const second = shots(id)[1];
     store().moveShot(id, second.id, -1);
-    expect(shots(id).map((s) => s.image)).toEqual(["b", "a", "c"]);
+    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "a", "c"]);
   });
 
   it("reorders a shot from one index to another", () => {
@@ -85,10 +85,10 @@ describe("shots & captions", () => {
     store().addShots(id, ["a", "b", "c", "d"]);
     // Move the first shot to the third slot.
     store().reorderShots(id, 0, 2);
-    expect(shots(id).map((s) => s.image)).toEqual(["b", "c", "a", "d"]);
+    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "c", "a", "d"]);
     // Move it back towards the front.
     store().reorderShots(id, 2, 1);
-    expect(shots(id).map((s) => s.image)).toEqual(["b", "a", "c", "d"]);
+    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "a", "c", "d"]);
   });
 
   it("ignores out-of-range or no-op reorders", () => {
@@ -97,14 +97,14 @@ describe("shots & captions", () => {
     store().reorderShots(id, 0, 0);
     store().reorderShots(id, 0, 5);
     store().reorderShots(id, -1, 1);
-    expect(shots(id).map((s) => s.image)).toEqual(["a", "b"]);
+    expect(shots(id).map((s) => s.imageId)).toEqual(["a", "b"]);
   });
 
   it("adds an empty shot with centered/global layout defaults", () => {
     const id = store().createProject("P");
     store().addEmptyShot(id);
     const shot = shots(id)[0];
-    expect(shot.image).toBeNull();
+    expect(shot.imageId).toBeNull();
     expect(shot).toMatchObject({ offX: 0, offY: 0, scale: null });
   });
 
@@ -113,9 +113,9 @@ describe("shots & captions", () => {
     store().addEmptyShot(id);
     const shotId = shots(id)[0].id;
     store().setShotImage(id, shotId, "data:new");
-    expect(shots(id)[0].image).toBe("data:new");
+    expect(shots(id)[0].imageId).toBe("data:new");
     store().setShotImage(id, shotId, null);
-    expect(shots(id)[0].image).toBeNull();
+    expect(shots(id)[0].imageId).toBeNull();
   });
 
   it("patches only the addressed shot's layout", () => {
@@ -352,7 +352,10 @@ describe("createFolderVersion", () => {
       keepCaptions: true,
     })!;
     expect(store().folders[v].name).toBe("Mocko 1.3.0");
-    expect(copiedShots(v).map((sh) => sh.image)).toEqual(["data:a", "data:b"]);
+    expect(copiedShots(v).map((sh) => sh.imageId)).toEqual([
+      "data:a",
+      "data:b",
+    ]);
     expect(copiedShots(v)[0]).toMatchObject({ claim: "Hi", sub: "There" });
   });
 
@@ -364,7 +367,7 @@ describe("createFolderVersion", () => {
     })!;
     const copies = copiedShots(v);
     expect(copies).toHaveLength(2);
-    expect(copies.map((sh) => sh.image)).toEqual([null, null]);
+    expect(copies.map((sh) => sh.imageId)).toEqual([null, null]);
     expect(copies[0]).toMatchObject({
       claim: "Hi",
       sub: "There",
@@ -380,7 +383,7 @@ describe("createFolderVersion", () => {
       keepCaptions: false,
     })!;
     expect(copiedShots(v)[0]).toMatchObject({
-      image: "data:a",
+      imageId: "data:a",
       claim: "",
       sub: "",
     });
@@ -389,7 +392,7 @@ describe("createFolderVersion", () => {
   it("keeps the design, including a background image, when images are cleared", () => {
     const { f, p } = seed();
     store().patchSettings(p, {
-      background: { type: "image", image: "data:bg" },
+      background: { type: "image", imageId: "data:bg" },
       device: { ...store().projects[p].device, frameColor: "#FF0000" },
     });
     const v = store().createFolderVersion(f, "Mocko 1.3.0", {
@@ -399,7 +402,7 @@ describe("createFolderVersion", () => {
     const copy = store()
       .projectOrder.map((id) => store().projects[id])
       .find((x) => x.folderId === v)!;
-    expect(copy.background).toEqual({ type: "image", image: "data:bg" });
+    expect(copy.background).toEqual({ type: "image", imageId: "data:bg" });
     expect(copy.device.frameColor).toBe("#FF0000");
   });
 
@@ -412,7 +415,7 @@ describe("createFolderVersion", () => {
     })!;
     expect(store().folders[v].name).toBe("Mocko 1.3.0 (2)");
     // The original release is a snapshot — it must not change.
-    expect(shots(p)[0]).toMatchObject({ image: "data:a", claim: "Hi" });
+    expect(shots(p)[0]).toMatchObject({ imageId: "data:a", claim: "Hi" });
   });
 
   it("ignores an unknown folder id", () => {
@@ -462,7 +465,7 @@ describe("applyToProjects", () => {
     expect(store().projects[ipad].device.frameColor).toBe("#FF0000");
     // A variant is defined by its preset and its screenshots — never overwritten.
     expect(store().projects[ipad].presetId).toBe(DEFAULT_PRESET_ID);
-    expect(shots(ipad).map((sh) => sh.image)).toEqual(["i1"]);
+    expect(shots(ipad).map((sh) => sh.imageId)).toEqual(["i1"]);
   });
 
   it("appends placeholders when the source has more shots (variant B)", () => {
@@ -471,13 +474,13 @@ describe("applyToProjects", () => {
     const result = shots(ipad);
     expect(result).toHaveLength(3);
     expect(result[0]).toMatchObject({
-      image: "i1",
+      imageId: "i1",
       claim: "One",
       sub: "Sub one",
     });
     // The two extra captions arrive as empty placeholders, ready for images.
-    expect(result[1]).toMatchObject({ image: null, claim: "" });
-    expect(result[2]).toMatchObject({ image: null, claim: "Three" });
+    expect(result[1]).toMatchObject({ imageId: null, claim: "" });
+    expect(result[2]).toMatchObject({ imageId: null, claim: "Three" });
   });
 
   it("leaves surplus target shots untouched", () => {
@@ -487,7 +490,7 @@ describe("applyToProjects", () => {
     expect(result).toHaveLength(4);
     expect(result[0].claim).toBe("One");
     // The 4th shot has no counterpart in the source — image and text survive.
-    expect(result[3]).toMatchObject({ image: "p4", claim: "" });
+    expect(result[3]).toMatchObject({ imageId: "p4", claim: "" });
   });
 
   it("does not copy the design when only captions are selected", () => {

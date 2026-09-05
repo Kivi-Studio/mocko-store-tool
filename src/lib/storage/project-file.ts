@@ -19,6 +19,7 @@ import {
   makeFolder,
 } from "@/lib/model/defaults";
 import { clamp, createId, finiteOr, slugify } from "@/lib/utils";
+import { getImageBlob, putImageBytes } from "@/lib/storage/image-store";
 import {
   ACCEPTED_IMAGE_TYPES,
   CAPTION_MAX_LENGTH,
@@ -52,6 +53,12 @@ export const PROJECT_FILE_EXT = ".studio";
  * The `.studio` file is a ZIP container: a small `manifest.json` plus the raw
  * image bytes under `images/`. Storing images as binary (instead of base64 in
  * JSON) avoids the ~33% base64 inflation and keeps the manifest small.
+ *
+ * Image entries are named by content id, so a screenshot reused across
+ * releases or projects is written once and referenced from every shot that
+ * uses it. That matters because screenshots are already-compressed PNG/JPEG:
+ * the ZIP's own deflate cannot shrink them, making deduplication the only
+ * lever on archive size.
  *
  * Two manifest shapes are read:
  *  - single project — `{ project: {...} }` (also the pre-v5 shape)
@@ -123,51 +130,55 @@ function extForMime(mime: string): string {
   return MIME_TO_EXT[mime] ?? "png";
 }
 
-function parseDataUrl(
-  dataUrl: string,
-): { mime: string; base64: string } | null {
-  const match = /^data:([^;,]+);base64,(.*)$/.exec(dataUrl);
-  if (!match) return null;
-  return { mime: match[1], base64: match[2] };
-}
-
 // ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 
-function addImage(zip: JSZip, dataUrl: string | null, name: string): ImageRef {
-  if (!dataUrl) return null;
-  const parsed = parseDataUrl(dataUrl);
-  if (!parsed) return null;
-  const path = `images/${name}.${extForMime(parsed.mime)}`;
-  zip.file(path, parsed.base64, { base64: true });
-  return { path, mime: parsed.mime };
+/**
+ * Resolves a content id from the image store and adds its bytes to the archive
+ * under a content-addressed path, writing each distinct image only once.
+ * `written` tracks what this archive already holds across all its projects.
+ */
+async function addImage(
+  zip: JSZip,
+  imageId: string | null,
+  written: Set<string>,
+): Promise<ImageRef> {
+  if (!imageId) return null;
+  const blob = await getImageBlob(imageId);
+  // A missing image exports as "no image" rather than failing the archive.
+  if (!blob) return null;
+  const mime = blob.type || "image/png";
+  const path = `images/${imageId}.${extForMime(mime)}`;
+  if (!written.has(path)) {
+    zip.file(path, await blob.arrayBuffer());
+    written.add(path);
+  }
+  return { path, mime };
 }
 
-/**
- * Writes a project's images into the archive and returns its manifest payload.
- * `prefix` namespaces the image paths so several projects can coexist in one
- * workspace archive without colliding (e.g. `p0-shot-0`, `p1-shot-0`).
- */
-function writeProject(
+/** Writes a project's images into the archive and returns its manifest payload. */
+async function writeProject(
   zip: JSZip,
   project: Project,
-  prefix: string,
-): ManifestProject {
+  written: Set<string>,
+): Promise<ManifestProject> {
   const bg = project.background;
   const background: ManifestBackground =
     bg.type === "image"
-      ? { type: "image", image: addImage(zip, bg.image, `${prefix}background`) }
+      ? { type: "image", image: await addImage(zip, bg.imageId, written) }
       : bg;
 
-  const shots: ManifestShot[] = project.shots.map((shot, i) => ({
-    image: addImage(zip, shot.image, `${prefix}shot-${i}`),
-    claim: shot.claim,
-    sub: shot.sub,
-    offX: shot.offX,
-    offY: shot.offY,
-    scale: shot.scale,
-  }));
+  const shots: ManifestShot[] = await Promise.all(
+    project.shots.map(async (shot) => ({
+      image: await addImage(zip, shot.imageId, written),
+      claim: shot.claim,
+      sub: shot.sub,
+      offX: shot.offX,
+      offY: shot.offY,
+      scale: shot.scale,
+    })),
+  );
 
   return {
     name: project.name,
@@ -186,7 +197,7 @@ export async function buildProjectArchive(project: Project): Promise<Blob> {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
     exportedAt: new Date().toISOString(),
-    project: writeProject(zip, project, ""),
+    project: await writeProject(zip, project, new Set()),
   };
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
   return zip.generateAsync({ type: "blob" });
@@ -212,11 +223,19 @@ export async function buildWorkspaceArchive(
   }));
   const idToRef = new Map(folders.map((f, i) => [f.id, `f${i}`]));
 
-  const manifestProjects = projects.map((project, i) => ({
-    ...writeProject(zip, project, `p${i}-`),
-    folderRef:
-      project.folderId != null ? (idToRef.get(project.folderId) ?? null) : null,
-  }));
+  // Shared across every project in the archive, so a screenshot used by six
+  // variants — or by three releases — is stored once.
+  const written = new Set<string>();
+  const manifestProjects = [];
+  for (const project of projects) {
+    manifestProjects.push({
+      ...(await writeProject(zip, project, written)),
+      folderRef:
+        project.folderId != null
+          ? (idToRef.get(project.folderId) ?? null)
+          : null,
+    });
+  }
 
   const manifest: Manifest = {
     format: PROJECT_FORMAT,
@@ -263,6 +282,11 @@ function boundedNumber(
  * missing, oversized, or not an allowed raster type — the mime from the
  * manifest is untrusted and must never reach the data URL unvalidated.
  */
+/**
+ * Reads one image out of the archive into the image store and returns its
+ * content id. Identical bytes from different entries — an older archive still
+ * stores one copy per shot — collapse onto a single stored image.
+ */
 async function readArchiveImage(
   zip: JSZip,
   ref: unknown,
@@ -273,11 +297,11 @@ async function readArchiveImage(
   if (!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(mime)) return null;
   const entry = zip.file(path);
   if (!entry) return null;
-  const base64 = await entry.async("base64");
-  if (base64.length > (MAX_IMAGE_BYTES / 3) * 4) {
+  const bytes = await entry.async("uint8array");
+  if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("An image in the archive is too large (max 10 MB)");
   }
-  return `data:${mime};base64,${base64}`;
+  return putImageBytes(bytes, mime);
 }
 
 function cappedString(value: unknown): string {
@@ -307,7 +331,10 @@ async function normalizeBackground(
       return { type: "solid", color: safeColor(bg.color, "#0B1020") };
     }
     if (bg.type === "image") {
-      return { type: "image", image: await readArchiveImage(zip, bg.image) };
+      return {
+        type: "image",
+        imageId: await readArchiveImage(zip, bg.image),
+      };
     }
   }
   return { ...DEFAULT_BACKGROUND };
@@ -372,7 +399,7 @@ async function normalizeShot(zip: JSZip, raw: unknown): Promise<Shot> {
   const s = (raw ?? {}) as Record<string, unknown>;
   return {
     id: createId(),
-    image: await readArchiveImage(zip, s.image),
+    imageId: await readArchiveImage(zip, s.image),
     claim: cappedString(s.claim),
     sub: cappedString(s.sub),
     offX: boundedNumber(s.offX, 0, OFFSET_MIN, OFFSET_MAX),

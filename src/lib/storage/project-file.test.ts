@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import "fake-indexeddb/auto";
+import { beforeAll, describe, it, expect } from "vitest";
 import JSZip from "jszip";
 import {
   buildProjectArchive,
@@ -11,8 +12,16 @@ import {
 import { makeFolder, makeProject } from "@/lib/model/defaults";
 import { MAX_SHOTS_PER_PROJECT } from "@/lib/model/limits";
 import type { Project } from "@/lib/model/types";
+import { putImageDataUrl } from "@/lib/storage/image-store";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
+
+/** Content id of {@link PNG}, once it is in the image store. */
+let pngId: string;
+
+beforeAll(async () => {
+  pngId = (await putImageDataUrl(PNG))!;
+});
 
 function sample(): Project {
   const p = makeProject("My App");
@@ -20,7 +29,7 @@ function sample(): Project {
   p.shots = [
     {
       id: "x",
-      image: PNG,
+      imageId: pngId,
       claim: "Hi",
       sub: "There",
       offX: 0.1,
@@ -49,7 +58,8 @@ describe("archive round-trip", () => {
     const parsed = await readProjectFile(await buildProjectArchive(sample()));
     expect(parsed.shots[0].claim).toBe("Hi");
     expect(parsed.shots[0].sub).toBe("There");
-    expect(parsed.shots[0].image).toBe(PNG);
+    // Content addressing makes the id survive a round-trip exactly.
+    expect(parsed.shots[0].imageId).toBe(pngId);
   });
 
   it("preserves per-shot device offset and size", async () => {
@@ -240,7 +250,46 @@ describe("import validation", () => {
       { "images/a.svg": "AAAA", "images/b.png": "AAAA" },
     );
     const parsed = await readProjectFile(blob);
-    expect(parsed.shots[0].image).toBeNull();
-    expect(parsed.shots[1].image).toBe("data:image/png;base64,AAAA");
+    expect(parsed.shots[0].imageId).toBeNull();
+    expect(parsed.shots[1].imageId).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe("export deduplication", () => {
+  it("writes a screenshot shared by several projects only once", async () => {
+    const a = sample();
+    const b = sample();
+    b.name = "Second";
+
+    const zip = await JSZip.loadAsync(await buildWorkspaceArchive([a, b], []));
+    // JSZip also lists the implicit "images/" directory entry.
+    const images = Object.keys(zip.files).filter(
+      (n) => n.startsWith("images/") && !zip.files[n].dir,
+    );
+
+    // Two projects, the same screenshot — one entry, named by content id.
+    expect(images).toHaveLength(1);
+    expect(images[0]).toBe(`images/${pngId}.png`);
+  });
+
+  it("collapses duplicate entries from an older archive on import", async () => {
+    // Pre-dedup archives stored one copy per shot, under per-shot paths.
+    const blob = await archiveFrom(
+      {
+        format: PROJECT_FORMAT,
+        version: PROJECT_VERSION,
+        project: {
+          name: "Old",
+          shots: [
+            { image: { path: "images/p0-shot-0.png", mime: "image/png" } },
+            { image: { path: "images/p0-shot-1.png", mime: "image/png" } },
+          ],
+        },
+      },
+      { "images/p0-shot-0.png": "AAAA", "images/p0-shot-1.png": "AAAA" },
+    );
+
+    const parsed = await readProjectFile(blob);
+    expect(parsed.shots[0].imageId).toBe(parsed.shots[1].imageId);
   });
 });

@@ -34,10 +34,10 @@ export const DEFAULT_DEVICE: DeviceStyle = {
   topSpace: 0.26,
 };
 
-export function makeShot(image: string | null): Shot {
+export function makeShot(imageId: string | null): Shot {
   return {
     id: createId(),
-    image,
+    imageId,
     claim: "",
     sub: "",
     offX: 0,

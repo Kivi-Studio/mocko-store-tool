@@ -1,38 +1,38 @@
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/model/limits";
+import { putImageBytes } from "@/lib/storage/image-store";
 
 /**
- * Validates and reads an uploaded image `File` into a data URL. Rejects
- * disallowed types and oversized files so nothing unexpected reaches the store
- * or the canvas.
+ * Validates an uploaded image `File` and puts its bytes into the image store,
+ * returning the content id to reference it by. Disallowed types and oversized
+ * files are rejected so nothing unexpected reaches the store or the canvas.
+ *
+ * The bytes go in as-is: reading the file as a data URL first would inflate it
+ * by ~33% only to be decoded again on the way into storage.
  */
-export function fileToDataUrl(file: File): Promise<string> {
+export async function fileToImageId(file: File): Promise<string> {
   if (!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
-    return Promise.reject(new Error(`Unsupported image type: ${file.type}`));
+    throw new Error(`Unsupported image type: ${file.type}`);
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return Promise.reject(new Error("Image is too large (max 10 MB)"));
+    throw new Error("Image is too large (max 10 MB)");
   }
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return putImageBytes(bytes, file.type);
 }
 
-/** Reads several files, skipping any that fail. Returns the successful ones. */
-export async function filesToDataUrls(files: Iterable<File>): Promise<{
-  images: string[];
+/** Reads several files, skipping any that fail. Returns the successful ids. */
+export async function filesToImageIds(files: Iterable<File>): Promise<{
+  imageIds: string[];
   failed: number;
 }> {
   const results = await Promise.allSettled(
-    [...files].map((f) => fileToDataUrl(f)),
+    [...files].map((f) => fileToImageId(f)),
   );
-  const images: string[] = [];
+  const imageIds: string[] = [];
   let failed = 0;
   for (const r of results) {
-    if (r.status === "fulfilled") images.push(r.value);
+    if (r.status === "fulfilled") imageIds.push(r.value);
     else failed += 1;
   }
-  return { images, failed };
+  return { imageIds, failed };
 }

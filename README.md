@@ -26,6 +26,8 @@ lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
   `.studio`-Datei.
 - **Undo/Redo**, automatische Persistenz (IndexedDB) und PWA-Support
   (installierbar, offline-fähig).
+- **Screenshots liegen inhaltsadressiert** in einem eigenen Store: ein Bild,
+  das mehrere Releases benutzen, wird einmal gespeichert und einmal exportiert.
 
 ## Voraussetzungen
 
@@ -125,7 +127,7 @@ src/
   lib/
     model/             # Domänentypen, Presets, Limits, Versionen
     render/            # Canvas-Rendering & Export
-    storage/           # IndexedDB, .studio-Dateien, Upload-Validierung
+    storage/           # IndexedDB, Bild-Store, .studio-Dateien, Upload
   store/               # Zustand-Store (Projekte, Ordner, Undo/Redo)
 ```
 

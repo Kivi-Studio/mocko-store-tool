@@ -55,12 +55,12 @@ comp/ ─┘
 
 ## `lib/` im Detail
 
-| Ordner     | Verantwortung                                                                             | Module                                                                                  |
-| ---------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
-| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren    | `render`, `export`, `image`                                                             |
-| `storage/` | Laden/Speichern — IndexedDB-Adapter, `.studio`-Projektdateien, Upload-Validierung         | `idb-storage`, `project-file`, `upload`                                                 |
-| (root)     | framework-unabhängige Kleinteile                                                          | `utils`                                                                                 |
+| Ordner     | Verantwortung                                                                                 | Module                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
+| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren        | `render`, `export`, `image`                                                             |
+| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung | `idb-storage`, `image-store`, `migrate-images`, `project-file`, `upload`                |
+| (root)     | framework-unabhängige Kleinteile                                                              | `utils`                                                                                 |
 
 Abhängigkeitsrichtung innerhalb `lib/`: `storage/` und `render/` bauen auf
 `model/` auf, `model/` nur auf `utils`. Keine Zyklen zwischen den Gruppen.
@@ -93,6 +93,33 @@ vollen Namen als Schlüssel und gruppieren daher nie versehentlich; `appName`
 ist die Ausnahme für Ordner, deren Name die Konvention nicht trägt. Die Galerie
 kennt damit drei Ebenen — Wurzel → App (`?app=`) → Release (`?folder=`) —
 ohne dass ein Ordner je einen Ordner enthält.
+
+## Bilder liegen außerhalb des States
+
+Screenshots lagen früher als base64-Data-URLs **im** persistierten State. Das
+hatte zwei Kosten, die mit jedem aufgehobenen Release wuchsen: Jeder Autosave
+klonte und schrieb die gesamte Bibliothek, und jede Version legte ihre eigene
+Kopie unveränderter Screenshots ab.
+
+`storage/image-store` speichert Bilder daher **inhaltsadressiert** in einer
+eigenen IndexedDB-Datenbank: Schlüssel ist der SHA-256 der Bytes, der Wert sind
+die Rohbytes plus Mime-Typ. Ein `Shot` hält nur noch `imageId`.
+
+- **Dedup fällt dabei ab.** Identische Bytes landen auf einem Eintrag — und in
+  der Praxis sind die Wiederholungen genau die Shots, die sich zwischen zwei
+  Releases nicht geändert haben.
+- **Auflösung** läuft über genau eine Stelle, `render/image.loadImageById`;
+  Objekt-URLs werden je Content-Id zwischengespeichert.
+- **`.studio`-Einträge heißen nach der Content-Id**, ein Bild wird also pro
+  Archiv einmal geschrieben. Beim Import kollabieren auch die Mehrfachkopien
+  älterer Archive. Screenshots sind bereits komprimiertes PNG/JPEG — Deflate
+  bringt nichts, Dedup ist der einzige Hebel auf die Archivgröße.
+- **Garbage Collection** nach der Hydration: was der State nicht mehr
+  referenziert, fliegt raus. Ein leerer State wird übersprungen — das ist
+  wahrscheinlicher ein fehlgeschlagener Ladevorgang als eine leere Bibliothek.
+- **Die Migration (v5 → v6) sichert den alten State** unter eigenem Schlüssel,
+  bevor sie etwas anfasst, und verwirft die Sicherung erst, wenn eine spätere
+  Sitzung die neue Form sauber geladen hat.
 
 ## State & Persistenz
 
