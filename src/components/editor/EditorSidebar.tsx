@@ -3,7 +3,12 @@
 import { useRef } from "react";
 import { ImagePlus, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
-import type { Background, DeviceStyle, Project, TextStyle } from "@/lib/model/types";
+import type {
+  Background,
+  DeviceStyle,
+  Project,
+  TextStyle,
+} from "@/lib/model/types";
 import { PRESETS, getPreset } from "@/lib/model/presets";
 import { FONT_OPTIONS } from "@/lib/model/fonts";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/model/limits";

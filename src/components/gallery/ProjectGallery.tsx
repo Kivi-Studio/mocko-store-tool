@@ -87,7 +87,9 @@ export function ProjectGallery() {
 
   const folderList = folderOrder.map((id) => folders[id]).filter(Boolean);
   const projectsInFolder = (id: string) =>
-    projectOrder.map((pid) => projects[pid]).filter((p) => p && p.folderId === id);
+    projectOrder
+      .map((pid) => projects[pid])
+      .filter((p) => p && p.folderId === id);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -122,7 +124,9 @@ export function ProjectGallery() {
       }
     } catch (error) {
       console.error(error);
-      toast.error(error instanceof Error ? error.message : "Could not read file");
+      toast.error(
+        error instanceof Error ? error.message : "Could not read file",
+      );
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -285,7 +289,9 @@ export function ProjectGallery() {
               <Button
                 variant={selectMode ? "secondary" : "outline"}
                 size="sm"
-                onClick={() => (selectMode ? clearSelection() : setSelectMode(true))}
+                onClick={() =>
+                  selectMode ? clearSelection() : setSelectMode(true)
+                }
               >
                 <CheckSquare className="size-4" />
                 {selectMode ? "Done" : "Select"}

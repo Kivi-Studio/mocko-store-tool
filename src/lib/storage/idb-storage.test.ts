@@ -1,7 +1,10 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect } from "vitest";
 import { set } from "idb-keyval";
-import { createIdbStorage, flushPendingWrites } from "@/lib/storage/idb-storage";
+import {
+  createIdbStorage,
+  flushPendingWrites,
+} from "@/lib/storage/idb-storage";
 
 describe("idb storage", () => {
   const storage = createIdbStorage<{ n: number }>();

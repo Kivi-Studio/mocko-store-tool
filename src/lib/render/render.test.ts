@@ -110,7 +110,17 @@ describe("computeDeviceRect", () => {
 
   it("draws the screen at a supplied aspect override", () => {
     // A tall area keeps the device width-driven so the screen aspect shows.
-    const r = computeDeviceRect(1000, 8000, 0, 8000, "android-phone", 0.8, 0, 0, 2.5);
+    const r = computeDeviceRect(
+      1000,
+      8000,
+      0,
+      8000,
+      "android-phone",
+      0.8,
+      0,
+      0,
+      2.5,
+    );
     expect(r.screenH / r.screenW).toBeCloseTo(2.5);
   });
 });
@@ -123,19 +133,19 @@ describe("screenAspectFor", () => {
 
   it("matches a Pixel 3a screenshot (1080×2220) so it fills without cropping", () => {
     // 2220 / 1080 ≈ 2.056 is inside the android-phone range, so it's used as-is.
-    expect(screenAspectFor("android-phone", { width: 1080, height: 2220 })).toBeCloseTo(
-      2220 / 1080,
-    );
+    expect(
+      screenAspectFor("android-phone", { width: 1080, height: 2220 }),
+    ).toBeCloseTo(2220 / 1080);
   });
 
   it("clamps an out-of-range image to the device bounds", () => {
     // A square image would warp the phone frame — clamp up to the min aspect.
-    expect(screenAspectFor("android-phone", { width: 1000, height: 1000 })).toBeCloseTo(
-      1.7,
-    );
+    expect(
+      screenAspectFor("android-phone", { width: 1000, height: 1000 }),
+    ).toBeCloseTo(1.7);
     // An ultra-tall panorama clamps down to the max aspect.
-    expect(screenAspectFor("android-phone", { width: 500, height: 3000 })).toBeCloseTo(
-      2.34,
-    );
+    expect(
+      screenAspectFor("android-phone", { width: 500, height: 3000 }),
+    ).toBeCloseTo(2.34);
   });
 });

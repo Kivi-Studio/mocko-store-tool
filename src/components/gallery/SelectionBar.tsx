@@ -31,12 +31,15 @@ export function SelectionBar({
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
       <div className="bg-popover text-popover-foreground pointer-events-auto flex items-center gap-2 rounded-full border py-2 pr-2 pl-4 shadow-lg">
-        <span className="text-sm font-medium">
-          {count} selected
-        </span>
+        <span className="text-sm font-medium">{count} selected</span>
         <span className="bg-border mx-1 h-5 w-px" />
 
-        <Button variant="ghost" size="sm" onClick={onExport} disabled={count === 0}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onExport}
+          disabled={count === 0}
+        >
           <Download className="size-4" />
           Export
         </Button>

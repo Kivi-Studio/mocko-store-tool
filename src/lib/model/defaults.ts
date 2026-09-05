@@ -46,7 +46,10 @@ export function makeShot(image: string | null): Shot {
   };
 }
 
-export function makeProject(name: string, folderId: string | null = null): Project {
+export function makeProject(
+  name: string,
+  folderId: string | null = null,
+): Project {
   const now = Date.now();
   return {
     id: createId(),

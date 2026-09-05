@@ -55,12 +55,12 @@ comp/ ─┘
 
 ## `lib/` im Detail
 
-| Ordner | Verantwortung | Module |
-|---|---|---|
-| `model/` | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
-| `render/` | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren | `render`, `export`, `image` |
-| `storage/` | Laden/Speichern — IndexedDB-Adapter, `.studio`-Projektdateien, Upload-Validierung | `idb-storage`, `project-file`, `upload` |
-| (root) | framework-unabhängige Kleinteile | `utils` |
+| Ordner     | Verantwortung                                                                             | Module                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
+| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren    | `render`, `export`, `image`                                                             |
+| `storage/` | Laden/Speichern — IndexedDB-Adapter, `.studio`-Projektdateien, Upload-Validierung         | `idb-storage`, `project-file`, `upload`                                                 |
+| (root)     | framework-unabhängige Kleinteile                                                          | `utils`                                                                                 |
 
 Abhängigkeitsrichtung innerhalb `lib/`: `storage/` und `render/` bauen auf
 `model/` auf, `model/` nur auf `utils`. Keine Zyklen zwischen den Gruppen.
