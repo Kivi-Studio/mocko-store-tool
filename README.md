@@ -9,14 +9,21 @@ lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
 
 ## Funktionsumfang
 
-- **Drei-Ebenen-Struktur:** Projekt (eine App) → Design (eine Sammlung wie
-  „App Store" oder „Play Store") → Storebild (ein einzelnes, exportierbares PNG).
-- **Editor** pro Storebild: Device-Frames platzieren/skalieren/rotieren,
-  Hintergrund, Text-Overlays, Format & Export-Größe.
-- **Duplizieren** von Storebildern und ganzen Designs (z. B. App-Store-Set
-  klonen und auf Android-Formate umstellen).
-- **Import/Export:** einzelne Designs als `.design`-Datei sichern/teilen,
-  Storebilder gebündelt als PNG-`.zip` exportieren.
+- **Projekte & Ordner:** Ein Projekt ist ein Screenshot-Set für _ein_
+  Store-Format (z. B. App Store · iPhone 6.9″). Ordner bündeln die Varianten
+  eines Releases — Store × Geräteklasse × Sprache.
+- **Editor:** Screenshots hochladen, Claim und Subtext je Shot, Hintergrund
+  (Solid/Gradient/Bild), Device-Frame, Layout-Presets; Position und Größe des
+  Geräts je Shot.
+- **Releases versionieren:** Ordner duplizieren oder per **„Neue Version…"**
+  unter `<App> X.Y.Z` kopieren — auf Wunsch mit geleerten Screenshots, wobei
+  Anzahl, Captions und Layout erhalten bleiben.
+- **Auf Geschwister übertragen:** Design und/oder Captions von einer fertigen
+  Variante auf die anderen Projekte im Ordner anwenden, ohne Preset und
+  Screenshots anzufassen.
+- **Import/Export:** Screenshots gebündelt als PNG/JPEG-`.zip`; einzelne
+  Projekte, ein Ordner, eine Auswahl oder der ganze Workspace als
+  `.studio`-Datei.
 - **Undo/Redo**, automatische Persistenz (IndexedDB) und PWA-Support
   (installierbar, offline-fähig).
 
@@ -100,7 +107,7 @@ Vor einem Commit empfiehlt sich `npm run check`.
 - **[Tailwind CSS v4](https://tailwindcss.com)** mit shadcn-/[Base UI](https://base-ui.com)-Komponenten
 - **[Zustand](https://zustand.docs.pmnd.rs) 5** für State, **[zundo](https://github.com/charkour/zundo)** für Undo/Redo
 - **[idb-keyval](https://github.com/jakearchibald/idb-keyval)** für IndexedDB-Persistenz
-- **[html-to-image](https://github.com/bubkoo/html-to-image)** + **[JSZip](https://stuk.github.io/jszip/)** + **file-saver** für den Export
+- **Canvas 2D** für das Rendering, **[JSZip](https://stuk.github.io/jszip/)** + **file-saver** für den Export
 - **[Vitest](https://vitest.dev)** + Testing Library + `jsdom` + `fake-indexeddb` für Tests
 
 ## Projektstruktur
@@ -108,24 +115,25 @@ Vor einem Commit empfiehlt sich `npm run check`.
 ```
 src/
   app/                 # Next.js App Router
-    page.tsx           # /              – Projektübersicht
-    project/[id]/      # /project/[id]  – Designs eines Projekts
-    design/[id]/       # /design/[id]   – Storebilder eines Designs
-    editor/[id]/       # /editor/[id]   – Editor für ein einzelnes Storebild
+    page.tsx           # /         – Galerie (Ordner & Projekte)
+    project/           # /project  – Editor, Projekt-Id als ?id=…
     manifest.ts        # PWA-Manifest
   components/
-    editor/            # Canvas, Frames, Text-Layer, Toolbar
-    gallery/           # Projekt-/Design-/Storebild-Karten & Galerien
-    panels/            # Editor-Seitenpanels (Format, Background, Frames, Text, Export)
+    editor/            # Canvas, Sidebar, Topbar, Shot-Karten
+    gallery/           # Ordner- & Projektkarten, Dialoge, Mehrfachauswahl
     ui/                # wiederverwendbare UI-Primitives
-  lib/                 # Domain-Typen, Geräte/Export-Größen, Export, IndexedDB, Utils
-  store/               # Zustand-Store (Projekte/Designs/Storebilder, Undo/Redo)
+  lib/
+    model/             # Domänentypen, Presets, Limits, Versionen
+    render/            # Canvas-Rendering & Export
+    storage/           # IndexedDB, .studio-Dateien, Upload-Validierung
+  store/               # Zustand-Store (Projekte, Ordner, Undo/Redo)
 ```
+
+Mehr zu Schichten und Abhängigkeitsrichtung in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Hinweis für die Weiterentwicklung
 
 Dieses Projekt nutzt eine Next.js-Version mit ggf. abweichenden APIs und
 Konventionen. Siehe [`AGENTS.md`](AGENTS.md) — die relevanten Guides liegen unter
 `node_modules/next/dist/docs/` und sollten vor Änderungen konsultiert werden.
-</content>
-</invoke>
