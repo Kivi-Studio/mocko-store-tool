@@ -25,6 +25,9 @@
 .DS_Store
 *.pem
 
+# throwaway design/HTML prototypes — kept locally, never committed
+/prototypes/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
