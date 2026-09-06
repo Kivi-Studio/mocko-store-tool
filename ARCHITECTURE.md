@@ -56,12 +56,12 @@ comp/ ─┘
 
 ## `lib/` in detail
 
-| Folder     | Responsibility                                                                        | Modules                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `model/`   | domain types, presets and the validation/allowlist rules that constrain the model     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
-| `render/`  | turn a shot into pixels: draw the canvas, decode images, export PNG/JPEG              | `render`, `export`, `image`                                                             |
-| `storage/` | load/save: IndexedDB adapter, image store, `.studio` project files, upload validation | `idb-storage`, `image-store`, `project-file`, `upload`                                  |
-| (root)     | framework-independent odds and ends                                                   | `utils`                                                                                 |
+| Folder     | Responsibility                                                                                              | Modules                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `model/`   | domain types, presets and the validation/allowlist rules that constrain the model                           | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
+| `render/`  | turn a shot into pixels: draw the canvas, decode images, export PNG/JPEG                                    | `render`, `export`, `image`                                                             |
+| `storage/` | load/save: IndexedDB adapter, image store, `.studio` project files, upload validation, the sample workspace | `idb-storage`, `image-store`, `project-file`, `upload`, `demo-workspace`                |
+| (root)     | framework-independent odds and ends                                                                         | `utils`                                                                                 |
 
 Dependency direction within `lib/`: `storage/` and `render/` build on `model/`,
 `model/` only on `utils`. No cycles between the groups.
@@ -179,6 +179,22 @@ that key, and it is deliberately not undoable: the images are gone, so a
 restored state would only point into the void. The empty state is written
 before the images are dropped, so another open tab picks it up instead of
 saving its stale copy back later.
+
+## The sample workspace is a file, not code
+
+`?demo` and "Load sample workspace" bring in two fictional apps to click
+through. The sample is **`public/demo.studio`**, an ordinary workspace export,
+and `storage/demo-workspace` does little more than fetch it and hand it to
+`readWorkspaceFile`. The only extra step is `withDefaultLanguage`, which moves
+the requested language to the front so `?demo=de` shows German covers.
+
+That is deliberate: the reader is the migrator anyway, so the file rides along
+with every model change for free, and a test reads the shipped file to make
+sure it stays complete and readable. Changing what the demo shows is an
+editing job in Mocko followed by "Export everything", not a code change. The
+screens inside were drawn once with a throwaway canvas script (kept locally
+under `prototypes/`, which is gitignored); they are JPEGs, because the
+gradients would cost megabytes as PNG.
 
 ## State & persistence
 

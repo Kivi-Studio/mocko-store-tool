@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,6 +11,7 @@ import {
   FilePlus2,
   FolderPlus,
   GitBranch,
+  Sparkles,
   Table2,
   Trash2,
   Upload,
@@ -28,6 +29,7 @@ import {
   type WorkspacePayload,
 } from "@/lib/storage/project-file";
 import { APP_VERSION } from "@/lib/version";
+import { demoLanguageFor } from "@/lib/storage/demo-workspace";
 import { groupFolders, versionLabel } from "@/lib/model/version";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -54,6 +56,7 @@ import { NewVersionDialog } from "./NewVersionDialog";
 import { BackupReminder } from "./BackupReminder";
 import { BackupDropZone } from "./BackupDropZone";
 import { WipeDialog } from "./WipeDialog";
+import { useLoadDemo } from "./useLoadDemo";
 
 export function ProjectGallery() {
   const router = useRouter();
@@ -75,6 +78,7 @@ export function ProjectGallery() {
   const createFolderVersion = useProjectStore((s) => s.createFolderVersion);
 
   const hydrated = useHydrated();
+  const loadDemo = useLoadDemo();
   const fileRef = useRef<HTMLInputElement>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<WorkspacePayload | null>(
@@ -85,6 +89,21 @@ export function ProjectGallery() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
+
+  // `?demo` (or `?demo=de`) loads the sample workspace and then drops the
+  // parameter, so the link can be passed around and reloaded without effect.
+  // Waits for hydration like every other write to the library. The native
+  // replaceState is enough here (the App Router picks it up); there is no
+  // navigation to make, only a query string to shed.
+  const demoParam = params.get("demo");
+  const demoHandled = useRef(false);
+  useEffect(() => {
+    if (demoParam === null || !hydrated || demoHandled.current) return;
+    demoHandled.current = true;
+    void loadDemo(demoLanguageFor(demoParam)).finally(() =>
+      window.history.replaceState(null, "", "/"),
+    );
+  }, [demoParam, hydrated, loadDemo]);
 
   // An unknown/deleted folder id falls back to the root view.
   const activeFolder = folderParam ? folders[folderParam] : undefined;
@@ -325,6 +344,12 @@ export function ProjectGallery() {
                   <Upload className="size-4" />
                   Import from file…
                 </DropdownMenuItem>
+                {/* Two fictional apps to click through, for a first look
+                    or for screenshots. Added like any other import. */}
+                <DropdownMenuItem onClick={() => void loadDemo("en")}>
+                  <Sparkles className="size-4" />
+                  Load sample workspace
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {/* The one way to also get rid of what older versions left in
                     storage; opening the app never touches that. */}
@@ -419,20 +444,38 @@ export function ProjectGallery() {
           ))}
         </div>
       ) : isEmpty ? (
-        <button
-          type="button"
-          onClick={handleCreate}
-          className="text-muted-foreground hover:border-foreground/30 hover:text-foreground flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-24 transition-colors"
-        >
-          <FilePlus2 className="size-10" />
-          <span className="text-sm font-medium">
-            {activeFolder
-              ? "This folder is empty. Add a project"
-              : activeApp
-                ? "This app has no releases left"
-                : "Create your first project"}
-          </span>
-        </button>
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="text-muted-foreground hover:border-foreground/30 hover:text-foreground flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-24 transition-colors"
+          >
+            <FilePlus2 className="size-10" />
+            <span className="text-sm font-medium">
+              {activeFolder
+                ? "This folder is empty. Add a project"
+                : activeApp
+                  ? "This app has no releases left"
+                  : "Create your first project"}
+            </span>
+          </button>
+          {/* Only on an empty library: the sample is a first look at the
+              tool, not something to drop into a folder of real work. */}
+          {!activeFolder && !activeApp && (
+            <p className="text-muted-foreground text-center text-sm">
+              Just looking around?{" "}
+              <button
+                type="button"
+                onClick={() => void loadDemo("en")}
+                className="text-foreground font-medium underline underline-offset-2 hover:opacity-80"
+              >
+                Load the sample workspace
+              </button>
+              : two fictional apps with releases, store formats and languages to
+              click through.
+            </p>
+          )}
+        </div>
       ) : viewMode === "grid" ? (
         <div className="space-y-8">
           {appItems.length > 0 && (

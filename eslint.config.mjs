@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Throwaway explorations, gitignored and never part of the app.
+    "prototypes/**",
   ]),
 ]);
 

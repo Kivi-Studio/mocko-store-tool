@@ -38,6 +38,14 @@ IndexedDB (no backend, no sign-in).
   (installable, works offline).
 - **Screenshots are content-addressed** in a store of their own: an image used
   by several releases is stored once and exported once.
+- **Sample workspace:** two fictional apps with releases, store formats and
+  two languages, to click through before the first real project exists. Load
+  it from the empty start page or the Backup menu, or open
+  [`/?demo`](https://mocko.kivistudio.de/?demo) (English) or
+  [`/?demo=de`](https://mocko.kivistudio.de/?demo=de) (German content). It is
+  an ordinary `.studio` file ([`public/demo.studio`](public/demo.studio)) that
+  comes in through the normal import; to change it, edit it in Mocko and export
+  the workspace again.
 
 ## Requirements
 
@@ -138,8 +146,10 @@ src/
   lib/
     model/             # Domain types, presets, limits, versions, locales
     render/            # Canvas rendering & export
-    storage/           # IndexedDB, image store, .studio files, upload
+    storage/           # IndexedDB, image store, .studio files, upload, sample workspace
   store/               # Zustand store (projects, folders, undo/redo)
+public/
+  demo.studio          # The sample workspace, loaded via ?demo or the Backup menu
 ```
 
 More on layers and dependency direction in
