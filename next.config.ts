@@ -8,6 +8,20 @@ const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
 };
 
 /**
+ * The build number: the build time as yyyyMMddHHmm, local time. It says at a
+ * glance when a deployed build was made (the footer prints
+ * "1.3.0 (202609061442)") and needs no manual bump.
+ */
+function buildStamp(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `${pad(now.getHours())}${pad(now.getMinutes())}`
+  );
+}
+
+/**
  * The app is a fully client-side tool (IndexedDB, no backend), so it ships as a
  * static export (`out/`) that any static host can serve, e.g. netcup shared
  * hosting via FTP.
@@ -22,6 +36,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_APP_BUILD: buildStamp(),
   },
 };
 

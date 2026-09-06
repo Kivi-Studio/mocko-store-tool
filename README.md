@@ -117,6 +117,10 @@ served by any static host, e.g. netcup shared hosting via FTP. The security
 headers are set via [`public/.htaccess`](public/.htaccess) (Apache), which is
 copied into `out/` on build.
 
+The footer shows the version from `package.json` and, in brackets, the build
+number: the build time as `yyyyMMddHHmm`. That says at a glance when a
+deployed build was made.
+
 To check the build locally, any static server will do, e.g.:
 
 ```bash

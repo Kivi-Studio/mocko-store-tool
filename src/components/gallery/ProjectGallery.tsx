@@ -28,7 +28,7 @@ import {
   readWorkspaceFile,
   type WorkspacePayload,
 } from "@/lib/storage/project-file";
-import { APP_VERSION } from "@/lib/version";
+import { APP_VERSION_LABEL } from "@/lib/version";
 import { demoLanguageFor } from "@/lib/storage/demo-workspace";
 import { groupFolders, versionLabel } from "@/lib/model/version";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -574,7 +574,7 @@ export function ProjectGallery() {
       )}
 
       <footer className="text-muted-foreground mt-12 text-center text-xs">
-        Mocko v{APP_VERSION} · Powered by{" "}
+        Mocko v{APP_VERSION_LABEL} · Powered by{" "}
         <a
           href="https://www.kivistudio.de"
           target="_blank"

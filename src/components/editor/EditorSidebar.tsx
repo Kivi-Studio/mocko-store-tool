@@ -26,7 +26,7 @@ import {
 } from "@/lib/model/limits";
 import { fileToImageId } from "@/lib/storage/upload";
 import { exportProjectFile, readProjectFile } from "@/lib/storage/project-file";
-import { APP_VERSION } from "@/lib/version";
+import { APP_VERSION_LABEL } from "@/lib/version";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useAddShots } from "./useAddShots";
 import {
@@ -413,7 +413,7 @@ export function EditorSidebar({ project }: { project: Project }) {
       </PanelSection>
 
       <p className="text-muted-foreground pt-2 text-center text-xs">
-        Mocko v{APP_VERSION} · Powered by{" "}
+        Mocko v{APP_VERSION_LABEL} · Powered by{" "}
         <a
           href="https://www.kivistudio.de"
           target="_blank"
