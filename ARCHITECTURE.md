@@ -57,12 +57,12 @@ comp/ ─┘
 
 ## `lib/` im Detail
 
-| Ordner     | Verantwortung                                                                                              | Module                                                                                        |
-| ---------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken                  | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version`       |
-| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren                     | `render`, `export`, `image`                                                                   |
-| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung, Migrationen | `idb-storage`, `image-store`, `migrate-images`, `migrate-languages`, `project-file`, `upload` |
-| (root)     | framework-unabhängige Kleinteile                                                                           | `utils`                                                                                       |
+| Ordner     | Verantwortung                                                                                 | Module                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
+| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren        | `render`, `export`, `image`                                                             |
+| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung | `idb-storage`, `image-store`, `project-file`, `upload`                                  |
+| (root)     | framework-unabhängige Kleinteile                                                              | `utils`                                                                                 |
 
 Abhängigkeitsrichtung innerhalb `lib/`: `storage/` und `render/` bauen auf
 `model/` auf, `model/` nur auf `utils`. Keine Zyklen zwischen den Gruppen.
@@ -121,10 +121,6 @@ Layout-Entscheidung über die Position, keine Übersetzung.
   vorhandenen Positionen — statt eine zweite Reihe daneben zu legen.
 - **Export** schreibt bei mehreren Sprachen einen ZIP-Ordner je Sprache; der
   Code steht zusätzlich im Dateinamen.
-- **Migration v6 → v7** ist bewusst mechanisch: jedes bestehende Projekt bekommt
-  _eine_ Sprache, geraten aus seinem Namen („Telly (iOS) (DE)"). Sie verschiebt
-  keine Inhalte zwischen Projekten — ein Fehlgriff ist ein Etikett, kein
-  Datenverlust.
 
 ## Bilder liegen außerhalb des States
 
@@ -149,9 +145,23 @@ die Rohbytes plus Mime-Typ. Ein `Shot` hält nur noch `imageId`.
 - **Garbage Collection** nach der Hydration: was der State nicht mehr
   referenziert, fliegt raus. Ein leerer State wird übersprungen — das ist
   wahrscheinlicher ein fehlgeschlagener Ladevorgang als eine leere Bibliothek.
-- **Die Migration (v5 → v6) sichert den alten State** unter eigenem Schlüssel,
-  bevor sie etwas anfasst, und verwirft die Sicherung erst, wenn eine spätere
-  Sitzung die neue Form sauber geladen hat.
+
+## Statt Migrationen: exportieren und importieren
+
+Es gibt **keine** Persist-Migrationen. Der State liegt unter dem Schlüssel
+`mocko`, Version 1; was unter dem alten `screenshot-studio` liegt, bleibt
+physisch unangetastet liegen, statt verworfen zu werden.
+
+Der Weg über eine Modelländerung hinweg ist stattdessen **exportieren →
+importieren**. Der `.studio`-Reader liest die alten Formen ohnehin — ein Shot
+ohne `images`-Map gehört zur einzigen Sprache, ein Projekt ohne `languages`
+bekommt die Standardsprache — und liefert das aktuelle Modell. Er _ist_ der
+Migrator, und zwar einer, den man beliebig oft gegen eine Datei laufen lassen
+und prüfen kann, statt eines Einmalversuchs gegen die lebende Datenbank.
+
+Das ist eine bewusste Entscheidung für eine App mit genau einem Nutzer: rund
+500 Zeilen Migrations-Maschinerie für einen Übergang, der einmal stattfindet,
+sind teurer als der Import-Schritt, den es ohnehin gibt.
 
 ## State & Persistenz
 

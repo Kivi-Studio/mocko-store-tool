@@ -1,4 +1,4 @@
-import type { Caption, Shot } from "@/lib/model/types";
+import type { Caption, Project, Shot } from "@/lib/model/types";
 
 /**
  * Reading a shot's per-language content.
@@ -25,4 +25,24 @@ export function imageIdFor(shot: Shot, code: string): string | null {
 /** True when the shot has a screenshot for every one of `codes`. */
 export function isComplete(shot: Shot, codes: readonly string[]): boolean {
   return codes.every((code) => imageIdFor(shot, code) !== null);
+}
+
+/**
+ * Every image id a set of projects still points at — the survivors of an image
+ * store sweep. An image is shared across languages and releases, so it may only
+ * go once the last reference to it has.
+ */
+export function referencedImageIds(
+  projects: Record<string, Project>,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const project of Object.values(projects)) {
+    if (project.background.type === "image" && project.background.imageId) {
+      ids.add(project.background.imageId);
+    }
+    for (const shot of project.shots) {
+      for (const id of Object.values(shot.images)) if (id) ids.add(id);
+    }
+  }
+  return ids;
 }

@@ -18,23 +18,16 @@ import type {
   TextStyle,
   ViewMode,
 } from "@/lib/model/types";
-import { captionFor, imageIdFor } from "@/lib/model/caption";
+import {
+  captionFor,
+  imageIdFor,
+  referencedImageIds,
+} from "@/lib/model/caption";
 import { mergeProjects as foldProjects } from "@/lib/model/merge";
 import type { MergePart } from "@/lib/model/merge";
 import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
-import {
-  backupLegacyState,
-  createIdbStorage,
-  discardLegacyBackup,
-  onExternalWrite,
-} from "@/lib/storage/idb-storage";
+import { createIdbStorage, onExternalWrite } from "@/lib/storage/idb-storage";
 import { sweep } from "@/lib/storage/image-store";
-import {
-  migrateProjectToImageStore,
-  referencedImageIds,
-  type ImageStoreProject,
-} from "@/lib/storage/migrate-images";
-import { migrateProjectToLanguages } from "@/lib/storage/migrate-languages";
 import { createId, uniqueName } from "@/lib/utils";
 
 /** Reorder direction: one step towards the front (-1) or the back (1). */
@@ -293,13 +286,6 @@ function copyFolder(
     },
   };
 }
-
-/**
- * True when this session ran the image-store migration. The pre-migration
- * backup is then kept until the *next* session loads the new shape cleanly —
- * proof that the migrated state was written and reads back.
- */
-let migratedThisSession = false;
 
 /** Replaces a project immutably, stamping updatedAt. */
 function withProject(
@@ -797,59 +783,13 @@ export const useProjectStore = create<ProjectStore>()(
           ),
       }),
       {
-        name: "screenshot-studio",
-        // The chain: v5 added folders and a per-project folderId, v6 moved
-        // screenshots into the content-addressed image store, v7 made a shot a
-        // *position* whose image and caption vary by language. Every version
-        // from v4 on migrates in place — no project is ever discarded. Anything
-        // older predates the current shot shape and is dropped (pre-release).
-        version: 7,
-        migrate: async (persisted, version) => {
-          const empty = {
-            projects: {},
-            projectOrder: [],
-            folders: {},
-            folderOrder: [],
-          };
-          if (
-            version < 4 ||
-            version > 6 ||
-            !persisted ||
-            typeof persisted !== "object"
-          ) {
-            return empty;
-          }
-          const s = persisted as {
-            projects?: Record<string, unknown>;
-            projectOrder?: string[];
-            folders?: Record<string, Folder>;
-            folderOrder?: string[];
-          };
-
-          // Park the untouched original first. Moving every screenshot in the
-          // library is the one write that could lose data, so the old state
-          // stays recoverable until a later session proves the new one loads.
-          await backupLegacyState(persisted);
-
-          const projects: Record<string, Project> = {};
-          for (const [id, raw] of Object.entries(s.projects ?? {})) {
-            // v6 already holds content ids; anything older still has inline
-            // data URLs and has to pass through the image store first.
-            const withImages =
-              version === 6
-                ? (raw as ImageStoreProject)
-                : await migrateProjectToImageStore(raw);
-            projects[id] = migrateProjectToLanguages(withImages);
-          }
-          migratedThisSession = true;
-          return {
-            projects,
-            projectOrder: s.projectOrder ?? Object.keys(projects),
-            // v4 predates folders entirely.
-            folders: version >= 5 ? (s.folders ?? {}) : {},
-            folderOrder: version >= 5 ? (s.folderOrder ?? []) : [],
-          };
-        },
+        // A fresh key, deliberately: the pre-language shapes are not migrated
+        // in place any more. Anything stored under the old "screenshot-studio"
+        // key stays physically untouched rather than being discarded, and a
+        // library from before this is brought over by exporting it and
+        // importing the `.studio` file, which the reader upgrades on the way in.
+        name: "mocko",
+        version: 1,
         storage: createIdbStorage(),
         partialize: (state) => ({
           projects: state.projects,
@@ -884,10 +824,6 @@ if (typeof window !== "undefined") {
   // IndexedDB rehydration must not become an undoable step.
   useProjectStore.persist.onFinishHydration((state) => {
     useProjectStore.temporal.getState().clear();
-
-    // A session that did not migrate has loaded the current shape from disk —
-    // the pre-migration backup has served its purpose.
-    if (!migratedThisSession) void discardLegacyBackup();
 
     // Drop images nothing points at any more: deleting a release only removes
     // its projects, and an image may still be shared with another release.
