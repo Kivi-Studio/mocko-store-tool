@@ -26,8 +26,13 @@ import {
 import { mergeProjects as foldProjects } from "@/lib/model/merge";
 import type { MergePart } from "@/lib/model/merge";
 import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
-import { createIdbStorage, onExternalWrite } from "@/lib/storage/idb-storage";
-import { sweep } from "@/lib/storage/image-store";
+import {
+  clearLegacyState,
+  createIdbStorage,
+  flushPendingWrites,
+  onExternalWrite,
+} from "@/lib/storage/idb-storage";
+import { clearImages, sweep } from "@/lib/storage/image-store";
 import { createId, uniqueName } from "@/lib/utils";
 
 /** Reorder direction: one step towards the front (-1) or the back (1). */
@@ -846,6 +851,27 @@ export function undo(): void {
 /** Redo the last undone change. */
 export function redo(): void {
   useProjectStore.temporal.getState().redo();
+}
+
+/**
+ * Deletes the whole library from this browser: the state, its persisted copy,
+ * every stored image, and whatever an older version left under its own key.
+ *
+ * Not undoable, on purpose: the images are gone, so a restored state would
+ * only point into the void. The empty state is written before the images go,
+ * so another open tab hears about the write and drops the library as well
+ * instead of saving its stale copy back later.
+ */
+export async function wipeWorkspace(): Promise<void> {
+  useProjectStore.setState({
+    projects: {},
+    projectOrder: [],
+    folders: {},
+    folderOrder: [],
+  });
+  useProjectStore.temporal.getState().clear();
+  await flushPendingWrites();
+  await Promise.all([clearImages(), clearLegacyState()]);
 }
 
 /** Selects a single project by id. */

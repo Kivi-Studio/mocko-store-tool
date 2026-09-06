@@ -12,12 +12,18 @@ import {
   FolderPlus,
   GitBranch,
   Table2,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useHydrated, useProjectStore } from "@/store/useProjectStore";
+import {
+  useHydrated,
+  useProjectStore,
+  wipeWorkspace,
+} from "@/store/useProjectStore";
 import {
   exportWorkspaceFile,
+  isProjectFile,
   readWorkspaceFile,
   type WorkspacePayload,
 } from "@/lib/storage/project-file";
@@ -43,7 +49,11 @@ import { ViewToggle } from "./ViewToggle";
 import { SelectionBar } from "./SelectionBar";
 import { ConfirmDeleteDialog, RenameDialog } from "./dialogs";
 import { ImportChoiceDialog } from "./ImportDialog";
+import { planImport } from "./import-plan";
 import { NewVersionDialog } from "./NewVersionDialog";
+import { BackupReminder } from "./BackupReminder";
+import { BackupDropZone } from "./BackupDropZone";
+import { WipeDialog } from "./WipeDialog";
 
 export function ProjectGallery() {
   const router = useRouter();
@@ -74,12 +84,13 @@ export function ProjectGallery() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [newVersionOpen, setNewVersionOpen] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
 
   // An unknown/deleted folder id falls back to the root view.
   const activeFolder = folderParam ? folders[folderParam] : undefined;
   const currentFolderId = activeFolder ? activeFolder.id : null;
 
-  // Selection is scoped to the current view — reset it when navigating between
+  // Selection is scoped to the current view. Reset it when navigating between
   // folders (adjust-state-during-render rather than an effect).
   const [prevFolderId, setPrevFolderId] = useState(currentFolderId);
   if (prevFolderId !== currentFolderId) {
@@ -145,18 +156,44 @@ export function ProjectGallery() {
     router.push(`/project/?id=${id}`);
   };
 
+  const runImport = (payload: WorkspacePayload, mode: "add" | "replace") => {
+    const { projects: ps, folders: fs } = payload;
+    importWorkspace(payload, mode);
+    setPendingImport(null);
+    toast.success(
+      mode === "replace"
+        ? `Replaced with ${ps.length} project(s)`
+        : `Imported ${ps.length} project(s)${fs.length ? ` in ${fs.length} folder(s)` : ""}`,
+    );
+    router.push("/");
+  };
+
   const handleImport = async (file?: File) => {
     if (!file) return;
     try {
+      // Judged by name before reading: a PNG dropped by mistake should hear
+      // "wrong kind of file", not what went wrong while unzipping it.
+      if (!isProjectFile(file)) {
+        toast.error("Invalid file. Only .studio backups can be imported.");
+        return;
+      }
       const payload = await readWorkspaceFile(file);
-      // A single loose project is added directly and opened, as before. A
-      // multi-project or folder-bearing backup asks how to import.
-      if (payload.folders.length > 0 || payload.projects.length > 1) {
-        setPendingImport(payload);
-      } else {
-        importWorkspace(payload, "add");
-        toast.success("Project imported");
-        router.push(`/project/?id=${payload.projects[0].id}`);
+      // The Backup menu only renders once hydrated, so an empty order really
+      // is an empty workspace and not one that has yet to load.
+      const workspaceEmpty =
+        projectOrder.length === 0 && folderOrder.length === 0;
+      switch (planImport(payload, workspaceEmpty)) {
+        case "open":
+          importWorkspace(payload, "add");
+          toast.success("Project imported");
+          router.push(`/project/?id=${payload.projects[0].id}`);
+          break;
+        case "add":
+          runImport(payload, "add");
+          break;
+        case "ask":
+          setPendingImport(payload);
+          break;
       }
     } catch (error) {
       console.error(error);
@@ -166,19 +203,6 @@ export function ProjectGallery() {
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
-  };
-
-  const runImport = (mode: "add" | "replace") => {
-    if (!pendingImport) return;
-    const { projects: ps, folders: fs } = pendingImport;
-    importWorkspace(pendingImport, mode);
-    setPendingImport(null);
-    toast.success(
-      mode === "replace"
-        ? `Replaced with ${ps.length} project(s)`
-        : `Imported ${ps.length} project(s)${fs.length ? ` in ${fs.length} folder(s)` : ""}`,
-    );
-    router.push("/");
   };
 
   const handleExportAll = async () => {
@@ -193,6 +217,17 @@ export function ProjectGallery() {
     } catch (error) {
       console.error(error);
       toast.error("Export failed");
+    }
+  };
+
+  const handleWipe = async () => {
+    try {
+      await wipeWorkspace();
+      toast.success("Everything deleted");
+      router.push("/");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not delete everything");
     }
   };
 
@@ -251,7 +286,7 @@ export function ProjectGallery() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Mocko</h1>
             <p className="text-muted-foreground text-sm">
-              Design App Store &amp; Google Play screenshots — upload, caption
+              Design App Store &amp; Google Play screenshots: upload, caption
               and export in store sizes.
             </p>
           </div>
@@ -264,6 +299,13 @@ export function ProjectGallery() {
             className="hidden"
             onChange={(e) => void handleImport(e.target.files?.[0])}
           />
+          {/* Same import as the menu, reached by dropping the file anywhere
+              on the page. Waits for hydration for the same reason the menu
+              does: `handleImport` needs to know whether the workspace is
+              really empty. */}
+          {hydrated && (
+            <BackupDropZone onFile={(file) => void handleImport(file)} />
+          )}
           {hydrated && (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -283,10 +325,20 @@ export function ProjectGallery() {
                   <Upload className="size-4" />
                   Import from file…
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {/* The one way to also get rid of what older versions left in
+                    storage; opening the app never touches that. */}
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setWipeOpen(true)}
+                >
+                  <Trash2 className="size-4" />
+                  Delete everything…
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {/* An app lists releases, not projects — so its primary action is
+          {/* An app lists releases, not projects, so its primary action is
               cutting the next release, not adding a loose project that would
               land at the root and not even show up here. */}
           {activeApp ? (
@@ -375,7 +427,7 @@ export function ProjectGallery() {
           <FilePlus2 className="size-10" />
           <span className="text-sm font-medium">
             {activeFolder
-              ? "This folder is empty — add a project"
+              ? "This folder is empty. Add a project"
               : activeApp
                 ? "This app has no releases left"
                 : "Create your first project"}
@@ -472,6 +524,12 @@ export function ProjectGallery() {
         </div>
       )}
 
+      {/* Nothing to lose yet on an empty workspace. The reminder appears
+          with the first project. */}
+      {hydrated && projectOrder.length > 0 && (
+        <BackupReminder onExport={() => void handleExportAll()} />
+      )}
+
       <footer className="text-muted-foreground mt-12 text-center text-xs">
         Mocko v{APP_VERSION} · Powered by{" "}
         <a
@@ -536,8 +594,8 @@ export function ProjectGallery() {
         }}
         projectCount={pendingImport?.projects.length ?? 0}
         folderCount={pendingImport?.folders.length ?? 0}
-        onAdd={() => runImport("add")}
-        onReplace={() => runImport("replace")}
+        onAdd={() => pendingImport && runImport(pendingImport, "add")}
+        onReplace={() => pendingImport && runImport(pendingImport, "replace")}
       />
 
       <ConfirmDeleteDialog
@@ -546,6 +604,15 @@ export function ProjectGallery() {
         title={`Delete ${selected.size} project(s)?`}
         description="The selected projects and all their screenshots will be permanently removed."
         onConfirm={handleDeleteSelected}
+      />
+
+      <WipeDialog
+        open={wipeOpen}
+        onOpenChange={setWipeOpen}
+        projectCount={projectOrder.length}
+        folderCount={folderOrder.length}
+        onExport={() => void handleExportAll()}
+        onConfirm={() => void handleWipe()}
       />
     </div>
   );

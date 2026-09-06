@@ -1,5 +1,8 @@
+import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
-import { useProjectStore } from "@/store/useProjectStore";
+import { get, set } from "idb-keyval";
+import { useProjectStore, wipeWorkspace } from "@/store/useProjectStore";
+import { hasImage, putImageBytes } from "@/lib/storage/image-store";
 import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
 import { makeFolder, makeProject } from "@/lib/model/defaults";
 import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
@@ -783,6 +786,31 @@ describe("workspace import", () => {
     expect(Object.keys(store().projects)).toEqual([project.id]);
     expect(store().projectOrder).toEqual([project.id]);
     expect(store().folderOrder).toEqual([]);
+  });
+});
+
+describe("wipeWorkspace", () => {
+  it("empties the library, its undo history and everything stored alongside", async () => {
+    const folder = store().createFolder("F");
+    const id = store().createProject("P", folder);
+    const imageId = await putImageBytes(new Uint8Array([1, 2, 3]), "image/png");
+    store().addShots(id, LANG, [imageId]);
+    // What an earlier version persisted under its own key.
+    await set("screenshot-studio", { state: { projects: {} }, version: 7 });
+
+    await wipeWorkspace();
+
+    expect(store().projects).toEqual({});
+    expect(store().projectOrder).toEqual([]);
+    expect(store().folders).toEqual({});
+    expect(store().folderOrder).toEqual([]);
+    // Nothing to undo back to: the images are gone with it.
+    expect(useProjectStore.temporal.getState().pastStates).toEqual([]);
+    expect(await hasImage(imageId)).toBe(false);
+    expect(await get("screenshot-studio")).toBeUndefined();
+    // The persisted copy is the empty state, not the stale library.
+    const persisted = await get<{ state: { projectOrder: string[] } }>("mocko");
+    expect(persisted?.state.projectOrder).toEqual([]);
   });
 });
 

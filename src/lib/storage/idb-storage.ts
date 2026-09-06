@@ -1,4 +1,4 @@
-import { del, get, set } from "idb-keyval";
+import { del, delMany, get, set } from "idb-keyval";
 import { toast } from "sonner";
 import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { createId } from "@/lib/utils";
@@ -26,6 +26,19 @@ const SYNC_CHANNEL = "screenshot-creator-sync";
 const TAB_ID = createId();
 
 const hasIndexedDb = (): boolean => typeof indexedDB !== "undefined";
+
+/**
+ * Keys earlier versions persisted the state under. Opening the app leaves them
+ * alone (see the store's persist options); only a deliberate wipe of the whole
+ * library removes them.
+ */
+const LEGACY_STATE_KEYS = ["screenshot-studio"];
+
+/** Deletes what older versions left in storage. Part of wiping the library. */
+export async function clearLegacyState(): Promise<void> {
+  if (!hasIndexedDb()) return;
+  await delMany(LEGACY_STATE_KEYS);
+}
 
 let channel: BroadcastChannel | null | undefined;
 function getChannel(): BroadcastChannel | null {

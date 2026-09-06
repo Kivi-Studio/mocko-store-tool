@@ -13,8 +13,10 @@ import {
 
 /**
  * Asks how to bring in an imported workspace: merge it with the current setup,
- * or replace everything. Shown only for multi-project / folder archives; a
- * single loose project is added without prompting.
+ * or replace everything. Shown only for multi-project / folder archives, and
+ * only when the workspace already has content. A single loose project is added
+ * without prompting, and so is any backup landing in an empty workspace, where
+ * both answers would do the same thing.
  */
 export function ImportChoiceDialog({
   open,

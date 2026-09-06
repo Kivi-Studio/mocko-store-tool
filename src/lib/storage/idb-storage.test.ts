@@ -1,7 +1,8 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect } from "vitest";
-import { set } from "idb-keyval";
+import { get, set } from "idb-keyval";
 import {
+  clearLegacyState,
   createIdbStorage,
   flushPendingWrites,
 } from "@/lib/storage/idb-storage";
@@ -44,5 +45,19 @@ describe("idb storage", () => {
     await storage.removeItem("k3");
     await flushPendingWrites();
     expect(await storage.getItem("k3")).toBeNull();
+  });
+
+  it("clearLegacyState drops the old key and leaves the current one alone", async () => {
+    await set("screenshot-studio", { state: { n: 7 }, version: 7 });
+    storage.setItem("mocko", { state: { n: 1 }, version: 1 });
+    await flushPendingWrites();
+
+    await clearLegacyState();
+
+    expect(await get("screenshot-studio")).toBeUndefined();
+    expect(await storage.getItem("mocko")).toEqual({
+      state: { n: 1 },
+      version: 1,
+    });
   });
 });

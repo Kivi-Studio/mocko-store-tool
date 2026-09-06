@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import {
   buildProjectArchive,
   buildWorkspaceArchive,
+  isProjectFile,
   readProjectFile,
   readWorkspaceFile,
   PROJECT_FORMAT,
@@ -384,5 +385,15 @@ describe("export deduplication", () => {
     expect(imageIdFor(parsed.shots[0], LANG)).toBe(
       imageIdFor(parsed.shots[1], LANG),
     );
+  });
+});
+
+describe("isProjectFile", () => {
+  it("judges by the .studio extension, regardless of case", () => {
+    expect(isProjectFile({ name: "mocko-backup.studio" })).toBe(true);
+    expect(isProjectFile({ name: "BACKUP.STUDIO" })).toBe(true);
+    expect(isProjectFile({ name: "screenshot.png" })).toBe(false);
+    expect(isProjectFile({ name: "backup.studio.zip" })).toBe(false);
+    expect(isProjectFile({ name: "studio" })).toBe(false);
   });
 });

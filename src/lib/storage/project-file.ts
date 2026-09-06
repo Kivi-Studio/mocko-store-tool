@@ -58,6 +58,16 @@ export const PROJECT_VERSION = 6;
 export const PROJECT_FILE_EXT = ".studio";
 
 /**
+ * Whether a file is a `.studio` backup, judged by its name. The content is
+ * checked when the archive is read; this is the quick answer for a file
+ * dropped or picked by mistake, so the message can say so plainly instead of
+ * reporting what went wrong while reading a PNG as a zip.
+ */
+export function isProjectFile(file: { name: string }): boolean {
+  return file.name.toLowerCase().endsWith(PROJECT_FILE_EXT);
+}
+
+/**
  * The `.studio` file is a ZIP container: a small `manifest.json` plus the raw
  * image bytes under `images/`. Storing images as binary (instead of base64 in
  * JSON) avoids the ~33% base64 inflation and keeps the manifest small.

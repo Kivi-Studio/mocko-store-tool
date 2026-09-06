@@ -1,4 +1,12 @@
-import { createStore, del, get, keys, set, type UseStore } from "idb-keyval";
+import {
+  clear,
+  createStore,
+  del,
+  get,
+  keys,
+  set,
+  type UseStore,
+} from "idb-keyval";
 
 /**
  * Content-addressed storage for screenshots.
@@ -151,4 +159,16 @@ export async function sweep(referenced: Iterable<string>): Promise<number> {
     removed += 1;
   }
   return removed;
+}
+
+/**
+ * Deletes every stored image, referenced or not. This is the wipe, not a
+ * sweep: the caller has already thrown the state away, so nothing is left that
+ * could point at an image.
+ */
+export async function clearImages(): Promise<void> {
+  const s = imageStore();
+  if (!s) return;
+  await clear(s);
+  urlCache.clear();
 }

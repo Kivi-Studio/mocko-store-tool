@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect } from "vitest";
 import {
+  clearImages,
   getImageBlob,
   hasImage,
   hashBytes,
@@ -86,5 +87,18 @@ describe("sweep", () => {
     // Two releases referenced it; one is deleted, the other still points at it.
     await sweep([shared, shared]);
     expect(await hasImage(shared)).toBe(true);
+  });
+});
+
+describe("clearImages", () => {
+  it("drops every image, referenced or not", async () => {
+    const a = await putImageBytes(bytes(5, 5), "image/png");
+    const b = await putImageBytes(bytes(6, 6), "image/png");
+    await clearImages();
+    expect(await hasImage(a)).toBe(false);
+    expect(await hasImage(b)).toBe(false);
+    // The store keeps working afterwards.
+    const c = await putImageBytes(bytes(7, 7), "image/png");
+    expect(await hasImage(c)).toBe(true);
   });
 });
