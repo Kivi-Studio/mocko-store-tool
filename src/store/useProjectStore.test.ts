@@ -375,6 +375,65 @@ describe("addShots across languages", () => {
   });
 });
 
+describe("mergeProjects", () => {
+  const variant = (name: string, code: string, image: string) => {
+    const id = store().createProject(name);
+    store().setDefaultLanguage(id, code);
+    store().addLanguage(id, { code, label: code.toUpperCase() });
+    store().setDefaultLanguage(id, code);
+    store().removeLanguage(id, LANG);
+    store().addShots(id, code, [image]);
+    return id;
+  };
+
+  it("folds the sources into the first project and removes the rest", () => {
+    const de = variant("Telly (DE)", "de", "de-1");
+    const en = variant("Telly (EN)", "en", "en-1");
+
+    const merged = store().mergeProjects([de, en], "Telly")!;
+
+    expect(merged).toBe(de);
+    expect(store().projects[en]).toBeUndefined();
+    expect(store().projectOrder).not.toContain(en);
+    expect(store().projects[merged].name).toBe("Telly");
+    expect(store().projects[merged].languages.map((l) => l.code)).toEqual([
+      "de",
+      "en",
+    ]);
+    expect(shots(merged)[0].images).toEqual({ de: "de-1", en: "en-1" });
+  });
+
+  it("refuses fewer than two projects", () => {
+    const de = variant("Telly (DE)", "de", "de-1");
+    expect(store().mergeProjects([de], "Telly")).toBeNull();
+    expect(store().mergeProjects([], "Telly")).toBeNull();
+    expect(store().projects[de]).toBeDefined();
+  });
+
+  it("uniquifies a merged name that a sibling already has", () => {
+    store().createProject("Telly");
+    const de = variant("Telly (DE)", "de", "de-1");
+    const en = variant("Telly (EN)", "en", "en-1");
+
+    const merged = store().mergeProjects([de, en], "Telly")!;
+
+    expect(store().projects[merged].name).toBe("Telly (2)");
+  });
+
+  it("is a single undo step", () => {
+    const de = variant("Telly (DE)", "de", "de-1");
+    const en = variant("Telly (EN)", "en", "en-1");
+    useProjectStore.temporal.getState().clear();
+
+    store().mergeProjects([de, en], "Telly");
+    expect(store().projects[en]).toBeUndefined();
+
+    useProjectStore.temporal.getState().undo();
+    expect(store().projects[en]).toBeDefined();
+    expect(store().projects[de].name).toBe("Telly (DE)");
+  });
+});
+
 describe("duplicateFolder", () => {
   /** A folder with two named projects, the first carrying one captioned shot. */
   const seedRelease = () => {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Boxes,
   Copy,
+  Merge,
   Download,
   Folder as FolderIcon,
   GitBranch,
@@ -29,6 +30,7 @@ import {
 import { ConfirmDeleteDialog, RenameDialog } from "./dialogs";
 import { NewVersionDialog } from "./NewVersionDialog";
 import { AssignAppDialog } from "./AssignAppDialog";
+import { MergeLanguagesDialog } from "./MergeLanguagesDialog";
 import { folderGroupKey } from "@/lib/model/version";
 
 /** Shared actions menu for a folder, used by both the grid tile and list row. */
@@ -45,6 +47,14 @@ export function FolderMenu({
   const duplicateFolder = useProjectStore((s) => s.duplicateFolder);
   const createFolderVersion = useProjectStore((s) => s.createFolderVersion);
   const setFolderApp = useProjectStore((s) => s.setFolderApp);
+  const mergeProjects = useProjectStore((s) => s.mergeProjects);
+  const folderProjects = useProjectStore(
+    useShallow((s) =>
+      s.projectOrder
+        .map((id) => s.projects[id])
+        .filter((p) => p && p.folderId === folder.id),
+    ),
+  );
   // Apps that already exist, offered as suggestions when filing this folder.
   const appNames = useProjectStore(
     useShallow((s) =>
@@ -66,6 +76,7 @@ export function FolderMenu({
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleExport = async () => {
@@ -113,6 +124,10 @@ export function FolderMenu({
           <DropdownMenuItem onClick={() => setVersionOpen(true)}>
             <GitBranch className="size-4" />
             New version…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setMergeOpen(true)}>
+            <Merge className="size-4" />
+            Merge by language…
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setAssignOpen(true)}>
             <Boxes className="size-4" />
@@ -171,6 +186,19 @@ export function FolderMenu({
           if (!id) return;
           toast.success(`Created “${name}”`);
           router.push(`/?folder=${id}`);
+        }}
+      />
+
+      <MergeLanguagesDialog
+        // Remount on open so the preview reflects the folder as it is now.
+        key={mergeOpen ? "merge-open" : "merge-closed"}
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        projects={folderProjects}
+        onMerge={(ids, name) => {
+          if (mergeProjects(ids, name)) {
+            toast.success(`Merged ${ids.length} projects into “${name}”`);
+          }
         }}
       />
 

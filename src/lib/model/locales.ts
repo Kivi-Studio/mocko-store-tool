@@ -70,3 +70,17 @@ export function guessLangCode(name: string): string | null {
   }
   return found;
 }
+
+/**
+ * The name without its trailing locale qualifier — "Telly (iOS) (DE)" becomes
+ * "Telly (iOS)". Only a *last* group that is a known locale is stripped, so
+ * "Telly (iOS)" is left alone.
+ */
+export function stripLangSuffix(name: string): string {
+  const trimmed = name.trim();
+  const match = /^(.*)[([]([^)\]]+)[)\]]\s*$/.exec(trimmed);
+  if (!match) return trimmed;
+  const token = match[2].trim().toLowerCase();
+  const isLocale = LOCALES.some((l) => l.code.toLowerCase() === token);
+  return isLocale ? match[1].trim() : trimmed;
+}
