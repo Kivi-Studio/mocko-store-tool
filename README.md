@@ -2,10 +2,30 @@
 
 **Production:** [https://mocko.kivistudio.de](https://mocko.kivistudio.de)
 
+![Mocko: store screenshots in minutes](docs/marketing/hero-en.jpg)
+
 A tool for creating **App Store & Google Play Store screenshots**, with device
 frames (iPhone, iPad, Pixel), backgrounds (solid/gradient), text overlays and
 PNG export. Runs entirely in the browser; all data is stored locally in
 IndexedDB (no backend, no sign-in).
+
+## Screenshots
+
+![The gallery: apps with their releases, loose folders and projects](docs/screenshots/en/gallery.png)
+
+![The editor: one language at a time, live previews, captions per shot](docs/screenshots/en/editor.png)
+
+![All captions of a release in one grid](docs/screenshots/en/captions.png)
+
+More in [`docs/screenshots/`](docs/screenshots/): the same views with German
+content, the shot detail panel and the editor in dark mode. They show the
+sample workspace described below.
+
+The marketing images in [`docs/marketing/`](docs/marketing/) (a 2400×1350
+hero and a 1200×630 link preview, each in English and German) are rendered
+from [`hero.html`](docs/marketing/hero.html) on top of those screenshots with
+`npm run marketing`. That needs Playwright's Chromium once:
+`npx playwright install chromium`.
 
 ## Features
 
@@ -105,18 +125,19 @@ npx serve out
 
 ## npm scripts
 
-| Script                 | Description                                                 |
-| ---------------------- | ----------------------------------------------------------- |
-| `npm run dev`          | Starts the Next.js development server (port 3000)           |
-| `npm run build`        | Creates the static production build in `out/`               |
-| `npm run start`        | (not used with `output: "export"`, see Build)               |
-| `npm run lint`         | ESLint                                                      |
-| `npm run typecheck`    | `next typegen` + TypeScript type check (`tsc --noEmit`)     |
-| `npm run format`       | Prettier: formats all files                                 |
-| `npm run format:check` | Prettier: checks formatting without making changes          |
-| `npm test`             | Runs the test suite (Vitest, single run)                    |
-| `npm run test:watch`   | Vitest in watch mode                                        |
-| `npm run check`        | Everything at once: lint + typecheck + format check + tests |
+| Script                 | Description                                                   |
+| ---------------------- | ------------------------------------------------------------- |
+| `npm run dev`          | Starts the Next.js development server (port 3000)             |
+| `npm run build`        | Creates the static production build in `out/`                 |
+| `npm run start`        | (not used with `output: "export"`, see Build)                 |
+| `npm run lint`         | ESLint                                                        |
+| `npm run typecheck`    | `next typegen` + TypeScript type check (`tsc --noEmit`)       |
+| `npm run format`       | Prettier: formats all files                                   |
+| `npm run format:check` | Prettier: checks formatting without making changes            |
+| `npm test`             | Runs the test suite (Vitest, single run)                      |
+| `npm run test:watch`   | Vitest in watch mode                                          |
+| `npm run check`        | Everything at once: lint + typecheck + format check + tests   |
+| `npm run marketing`    | Renders the hero and link-preview images in `docs/marketing/` |
 
 Running `npm run check` before a commit is recommended.
 
@@ -150,6 +171,9 @@ src/
   store/               # Zustand store (projects, folders, undo/redo)
 public/
   demo.studio          # The sample workspace, loaded via ?demo or the Backup menu
+docs/
+  screenshots/         # UI screenshots for README and portfolio (de, en, en-dark)
+  marketing/           # Hero and link-preview images, rendered from hero.html
 ```
 
 More on layers and dependency direction in

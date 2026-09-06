@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mocko hero</title>
+    <!--
+      Marketing image template. Rendered by render.mjs (Playwright), which opens
+      it with ?lang=de|en&size=wide|social&shot=editor|release|captions and
+      screenshots the viewport. The UI screenshot comes from ../screenshots/.
+    -->
+    <style>
+      :root {
+        --blue: #3d7bff;
+        --violet: #8b5cf6;
+        --ink: #0f1222;
+      }
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+          Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* The stage is always laid out at 2400 px wide; smaller outputs scale it. */
+      .stage {
+        position: relative;
+        width: 2400px;
+        height: 1350px;
+        transform-origin: top left;
+        overflow: hidden;
+        color: #fff;
+        background:
+          radial-gradient(
+            ellipse at 18% 0%,
+            rgba(255, 255, 255, 0.22),
+            transparent 45%
+          ),
+          radial-gradient(
+            ellipse at 100% 100%,
+            rgba(139, 92, 246, 0.85),
+            transparent 55%
+          ),
+          linear-gradient(
+            130deg,
+            var(--blue) 0%,
+            #5f6cf7 55%,
+            var(--violet) 100%
+          );
+      }
+      body.social .stage {
+        height: 1260px;
+        transform: scale(0.5);
+      }
+      .copy {
+        position: absolute;
+        left: 120px;
+        top: 0;
+        bottom: 0;
+        width: 640px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 40px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-size: 40px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .brand img {
+        width: 64px;
+        height: 64px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+      h1 {
+        margin: 0;
+        font-size: 72px;
+        line-height: 1.06;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        text-wrap: balance;
+      }
+      .sub {
+        margin: 0;
+        font-size: 29px;
+        line-height: 1.4;
+        opacity: 0.88;
+        text-wrap: pretty;
+      }
+      .url {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        align-self: flex-start;
+        padding: 12px 22px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        font-size: 24px;
+        font-weight: 500;
+      }
+      .url::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #7cf5b6;
+        box-shadow: 0 0 12px #7cf5b6;
+      }
+      /* Browser window holding the app screenshot. */
+      .window {
+        position: absolute;
+        left: 840px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 1560px;
+        border-radius: 22px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow:
+          0 60px 140px rgba(8, 10, 40, 0.45),
+          0 12px 32px rgba(8, 10, 40, 0.25);
+      }
+      .titlebar {
+        height: 60px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 24px;
+        background: #eef0f4;
+        border-bottom: 1px solid #dfe3ea;
+      }
+      .dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+      }
+      .dot.r {
+        background: #ff5f57;
+      }
+      .dot.y {
+        background: #febc2e;
+      }
+      .dot.g {
+        background: #28c840;
+      }
+      .address {
+        margin-left: auto;
+        margin-right: auto;
+        padding: 8px 40px;
+        border-radius: 10px;
+        background: #fff;
+        color: #5b6270;
+        font-size: 18px;
+        border: 1px solid #dfe3ea;
+      }
+      /* Cropped in the gap under the first row of shot cards, so the window
+         ends on a clean edge instead of a half-visible second row. */
+      .shot {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1440 / 790;
+        object-fit: cover;
+        object-position: top;
+      }
+      /* Link previews are viewed small: bigger copy, window bleeding off the
+         right edge. */
+      body.social .copy {
+        width: 780px;
+        gap: 48px;
+      }
+      body.social h1 {
+        font-size: 84px;
+      }
+      body.social .sub {
+        font-size: 38px;
+      }
+      body.social .url {
+        font-size: 30px;
+        padding: 16px 28px;
+      }
+      body.social .window {
+        left: 1000px;
+        width: 1640px;
+      }
+      body.dark .window {
+        background: #111318;
+      }
+      body.dark .titlebar {
+        background: #1c1f26;
+        border-color: #2a2e37;
+      }
+      body.dark .address {
+        background: #111318;
+        color: #9aa3b2;
+        border-color: #2a2e37;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="copy">
+        <div class="brand">
+          <img src="../../public/logo.svg" alt="" />
+          <span>Mocko</span>
+        </div>
+        <h1 id="headline"></h1>
+        <p class="sub" id="sub"></p>
+        <span class="url">mocko.kivistudio.de</span>
+      </div>
+      <div class="window">
+        <div class="titlebar">
+          <span class="dot r"></span>
+          <span class="dot y"></span>
+          <span class="dot g"></span>
+          <span class="address">mocko.kivistudio.de</span>
+        </div>
+        <img class="shot" id="shot" alt="" />
+      </div>
+    </div>
+    <script>
+      const COPY = {
+        en: {
+          headline: "Store screenshots in minutes.",
+          sub: "Device frames, captions and export in store sizes. Multilingual, entirely in the browser, no backend.",
+        },
+        de: {
+          headline: "Store\u2011Screenshots in Minuten.",
+          sub: "Gerätrahmen, Claims und Export in Store-Größen. Mehrsprachig, komplett im Browser, ohne Backend.",
+        },
+      };
+      const params = new URLSearchParams(location.search);
+      const lang = params.get("lang") === "de" ? "de" : "en";
+      const size = params.get("size") === "social" ? "social" : "wide";
+      const shot = params.get("shot") || "editor";
+      const dark = params.get("dark") === "1";
+      document.documentElement.lang = lang;
+      document.body.classList.toggle("social", size === "social");
+      document.body.classList.toggle("dark", dark);
+      document.getElementById("headline").textContent = COPY[lang].headline;
+      document.getElementById("sub").textContent = COPY[lang].sub;
+      document.getElementById("shot").src =
+        `../screenshots/${dark ? `${lang}-dark` : lang}/${shot}.png`;
+    </script>
+  </body>
+</html>
