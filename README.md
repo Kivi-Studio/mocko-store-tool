@@ -189,6 +189,9 @@ This project uses a Next.js version whose APIs and conventions may differ from
 what you know. See [`AGENTS.md`](AGENTS.md). The relevant guides are in
 `node_modules/next/dist/docs/` and should be consulted before making changes.
 
+For setup, conventions and the pre-commit check, see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## License
 
 Copyright (c) 2026 Pierre Sucker (Kivi Studio)
