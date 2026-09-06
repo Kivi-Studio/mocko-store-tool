@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   applicationName: "Mocko",
   description:
-    "Design App Store & Google Play screenshots — device mockups, backgrounds, captions and PNG/JPEG export.",
+    "Design App Store & Google Play screenshots with device mockups, backgrounds, captions and PNG/JPEG export.",
 };
 
 export default function RootLayout({

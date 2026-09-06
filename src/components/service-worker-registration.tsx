@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * Registers the offline service worker (production only — in dev it would
+ * Registers the offline service worker (production only: in dev it would
  * cache stale builds). The app is fully local (IndexedDB), so it should keep
  * working without a network connection.
  */
@@ -12,7 +12,7 @@ export function ServiceWorkerRegistration() {
     if (!("serviceWorker" in navigator)) return;
 
     // In dev, a service worker left over from a production build keeps serving
-    // its cached (stale) bundle — old JS runs even after the dev server
+    // its cached (stale) bundle. Old JS runs even after the dev server
     // rebuilds. So actively unregister any worker and drop its caches instead
     // of merely skipping registration.
     if (process.env.NODE_ENV !== "production") {

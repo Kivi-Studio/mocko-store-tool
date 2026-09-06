@@ -33,7 +33,7 @@ async function loadImageOrNull(
 
 /**
  * Resolves a content id from the image store and decodes it. Returns null for
- * an empty id, and for one whose bytes are gone — a missing image renders as
+ * an empty id, and for one whose bytes are gone. A missing image renders as
  * an empty placeholder rather than failing the whole canvas.
  */
 export async function loadImageById(

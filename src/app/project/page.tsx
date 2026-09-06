@@ -17,7 +17,7 @@ function Loading() {
 
 // The project id travels in the query string (`/project/?id=…`) rather than a
 // path segment. Ids are created at runtime in the browser, so there is nothing
-// to prebuild — a single static `/project` page serves every project, which is
+// to prebuild. A single static `/project` page serves every project, which is
 // what lets the app ship as a static export.
 function ProjectView() {
   const id = useSearchParams().get("id") ?? "";

@@ -46,7 +46,7 @@ export function EditorTopbar({ project }: { project: Project }) {
   return (
     <header className="bg-card flex h-14 shrink-0 items-center gap-2 border-b px-3">
       <Link
-        // Back lands where the project lives — its folder, or the root view.
+        // Back lands where the project lives: its folder, or the root view.
         href={project.folderId ? `/?folder=${project.folderId}` : "/"}
         aria-label="Back to projects"
         className={buttonVariants({ variant: "ghost", size: "icon" })}
@@ -118,7 +118,7 @@ export function EditorTopbar({ project }: { project: Project }) {
             const n = applyToProjects(project.id, targetIds, options);
             if (n > 0) {
               toast.success(
-                `Applied to ${n} ${n === 1 ? "project" : "projects"} — use undo to revert`,
+                `Applied to ${n} ${n === 1 ? "project" : "projects"}. Use undo to revert`,
               );
             }
           }}

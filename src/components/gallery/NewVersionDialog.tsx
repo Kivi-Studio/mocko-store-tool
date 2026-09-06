@@ -33,7 +33,7 @@ const BUMPS: { kind: BumpKind; label: string }[] = [
 ];
 
 /**
- * Snapshots a release folder under a new version name — the one-step
+ * Snapshots a release folder under a new version name: the one-step
  * replacement for exporting a folder, re-importing it and renaming the copy.
  *
  * The app name and version are edited separately so the version can be bumped
@@ -56,8 +56,8 @@ export function NewVersionDialog({
   projectCount: number;
   takenNames: readonly string[];
   /**
-   * App name to prefill, when it is known independently of the folder name —
-   * a folder pulled into an app via `appName` may not carry it in its own name.
+   * App name to prefill, when it is known independently of the folder name.
+   * A folder pulled into an app via `appName` may not carry it in its own name.
    * Defaults to the base parsed from the source folder.
    */
   baseName?: string;
@@ -179,7 +179,7 @@ export function NewVersionDialog({
             {!keepImages && (
               <p className="text-muted-foreground text-xs">
                 The shots stay as empty placeholders, so the count, order and
-                per-shot layout survive — drop the new screenshots in.
+                per-shot layout survive. Drop the new screenshots in.
               </p>
             )}
           </div>

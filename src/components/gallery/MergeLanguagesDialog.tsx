@@ -33,7 +33,7 @@ import {
  * the same listing and say which language each one is. Names from the
  * one-project-per-language era were written in whatever way suited at the time,
  * and a rule that reads them all correctly is a rule that will eventually read
- * one wrongly — so this asks instead.
+ * one wrongly, so this asks instead.
  *
  * The dialog stays open after a merge and the list shrinks, so a folder is
  * worked through in one sitting.

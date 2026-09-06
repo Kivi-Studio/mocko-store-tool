@@ -1,4 +1,4 @@
-# Mocko — static export served by Apache (e.g. netcup Webhosting).
+# Mocko: static export served by Apache (e.g. netcup Webhosting).
 # This file is copied verbatim into out/ on `next build` and must sit in the
 # document root next to index.html.
 
@@ -17,7 +17,7 @@
 
 # --- Caching ---
 <IfModule mod_headers.c>
-  # Hashed Next.js assets never change under the same name — cache hard.
+  # Hashed Next.js assets never change under the same name. Cache hard.
   <FilesMatch "\.(js|css|woff2?|png|jpg|jpeg|svg|ico)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>

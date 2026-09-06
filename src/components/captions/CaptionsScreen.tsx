@@ -30,7 +30,7 @@ function CaptionCell({
 
   if (!shot) {
     // A shorter project simply has nothing at this position. Typing here would
-    // have to invent a shot, which is what "Apply to…" is for — this view only
+    // have to invent a shot, which is what "Apply to…" is for. This view only
     // ever edits text.
     return (
       <span className="text-muted-foreground/60 text-xs italic">no shot</span>
@@ -81,7 +81,7 @@ type Column = { project: Project; language: Language };
  * A release folder holds the same screenshots per store, device and language,
  * so its copy is written once and then repeated across four to six projects.
  * Clicking through each project to compare or fix a line is the slow part;
- * here the whole release is one grid — rows are shot positions, columns are
+ * here the whole release is one grid: rows are shot positions, columns are
  * projects. After captions move to a per-language model the columns become
  * languages, which is the shape a translator actually wants.
  */
@@ -130,7 +130,7 @@ export function CaptionsScreen({
 
       {columns.length === 0 || rowCount === 0 ? (
         <div className="text-muted-foreground flex flex-1 items-center justify-center py-24 text-sm">
-          Nothing to caption yet — add screenshots to this release first.
+          Nothing to caption yet. Add screenshots to this release first.
         </div>
       ) : (
         <div className="flex-1 overflow-auto">

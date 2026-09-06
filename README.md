@@ -1,153 +1,170 @@
 # Mocko
 
-**Produktion:** [https://mocko.kivistudio.de](https://mocko.kivistudio.de)
+**Production:** [https://mocko.kivistudio.de](https://mocko.kivistudio.de)
 
-Ein Tool zum Erstellen von **App Store & Google Play Store Screenshots** — mit
-Device-Frames (iPhone, iPad, Pixel), Hintergründen (Solid/Gradient),
-Text-Overlays und PNG-Export. Läuft vollständig im Browser; alle Daten werden
-lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
+A tool for creating **App Store & Google Play Store screenshots**, with device
+frames (iPhone, iPad, Pixel), backgrounds (solid/gradient), text overlays and
+PNG export. Runs entirely in the browser; all data is stored locally in
+IndexedDB (no backend, no sign-in).
 
-## Funktionsumfang
+## Features
 
-- **Projekte & Ordner:** Ein Projekt ist ein Screenshot-Set für _ein_
-  Store-Format (z. B. App Store · iPhone 6.9″). Ordner bündeln die Varianten
-  eines Releases — Store × Geräteklasse × Sprache.
-- **Mehrsprachig:** Ein Projekt hält beliebig viele Sprachen — jede mit
-  eigenen Screenshots _und_ eigenen Texten, weil eine lokalisierte App pro
-  Sprache anders aussieht. Ein Umschalter im Editor, der Export schreibt einen
-  Ordner je Sprache.
-- **Editor:** Screenshots hochladen, Claim und Subtext je Position, Hintergrund
-  (Solid/Gradient/Bild), Device-Frame, Layout-Presets; Position und Größe des
-  Geräts je Shot.
-- **Releases versionieren:** Ordner duplizieren oder per **„Neue Version…"**
-  unter `<App> X.Y.Z` kopieren — auf Wunsch mit geleerten Screenshots, wobei
-  Anzahl, Captions und Layout erhalten bleiben.
-- **Nach Sprache zusammenführen:** bestehende Ein-Sprach-Projekte lassen sich
-  zu einem mehrsprachigen falten — du hakst sie ab und sagst, welche Sprache
-  jedes ist; geraten wird nichts.
-- **Caption-Ansicht je Release:** alle Texte eines Ordners als Raster —
-  Zeilen sind Shot-Positionen, Spalten die Projekte —, direkt editierbar,
-  statt sich durch jedes Projekt einzeln zu klicken.
-- **Auf Geschwister übertragen:** Design und/oder Captions von einer fertigen
-  Variante auf die anderen Projekte im Ordner anwenden, ohne Preset und
-  Screenshots anzufassen.
-- **Import/Export:** Screenshots gebündelt als PNG/JPEG-`.zip`; einzelne
-  Projekte, ein Ordner, eine Auswahl oder der ganze Workspace als
-  `.studio`-Datei.
-- **Undo/Redo**, automatische Persistenz (IndexedDB) und PWA-Support
-  (installierbar, offline-fähig).
-- **Screenshots liegen inhaltsadressiert** in einem eigenen Store: ein Bild,
-  das mehrere Releases benutzen, wird einmal gespeichert und einmal exportiert.
+- **Projects & folders:** A project is a screenshot set for _one_ store format
+  (e.g. App Store · iPhone 6.9″). Folders bundle the variants of a release:
+  store × device class × language.
+- **Multilingual:** A project holds any number of languages, each with its own
+  screenshots _and_ its own texts, because a localized app looks different in
+  every language. One switch in the editor, and the export writes one folder
+  per language.
+- **Editor:** upload screenshots, claim and subtext per position, background
+  (solid/gradient/image), device frame, layout presets; device position and
+  size per shot.
+- **Versioning releases:** duplicate a folder, or copy it to `<App> X.Y.Z` via
+  **"New version…"**, optionally with the screenshots cleared while count,
+  captions and layout are kept.
+- **Merge by language:** existing single-language projects can be folded into
+  one multilingual project. You tick them off and say which language each one
+  is; nothing is guessed.
+- **Caption view per release:** all texts of a folder as a grid (rows are shot
+  positions, columns are the projects), directly editable, instead of clicking
+  through every project one by one.
+- **Apply to siblings:** apply design and/or captions from one finished variant
+  to the other projects in the folder without touching preset or screenshots.
+- **Import/export:** screenshots bundled as a PNG/JPEG `.zip`; individual
+  projects, a folder, a selection or the whole workspace as a `.studio` file,
+  which can also be dropped straight onto the gallery to import it. The Backup
+  menu can also delete everything Mocko has stored in the browser.
+- **Undo/redo**, automatic persistence (IndexedDB) and PWA support
+  (installable, works offline).
+- **Screenshots are content-addressed** in a store of their own: an image used
+  by several releases is stored once and exported once.
 
-## Voraussetzungen
+## Requirements
 
-| Werkzeug    | Version                                                    |
-| ----------- | ---------------------------------------------------------- |
-| **Node.js** | `22` (siehe [`.nvmrc`](.nvmrc)); Minimum `>=20.9`          |
-| **npm**     | wird mit Node ausgeliefert (Lockfile: `package-lock.json`) |
-| **Browser** | aktueller Browser mit IndexedDB-Support                    |
+| Tool        | Version                                         |
+| ----------- | ----------------------------------------------- |
+| **Node.js** | `22` (see [`.nvmrc`](.nvmrc)); minimum `>=20.9` |
+| **npm**     | ships with Node (lockfile: `package-lock.json`) |
+| **Browser** | a current browser with IndexedDB support        |
 
-Es werden **keine** Umgebungsvariablen, Datenbank oder API-Keys benötigt — die
-App ist vollständig clientseitig.
+**No** environment variables, database or API keys are needed. The app is
+entirely client-side.
 
-Wenn du [nvm](https://github.com/nvm-sh/nvm) nutzt, übernimmt es die Node-Version
-aus `.nvmrc`:
+If you use [nvm](https://github.com/nvm-sh/nvm), it picks up the Node version
+from `.nvmrc`:
 
 ```bash
-nvm install   # installiert die in .nvmrc gepinnte Version
+nvm install   # installs the version pinned in .nvmrc
 nvm use
 ```
 
 ## Setup
 
 ```bash
-# 1. Repository klonen
+# 1. Clone the repository
 git clone <repo-url>
 cd kivi-studio-store-tool
 
-# 2. Abhängigkeiten installieren (deterministisch, gemäß Lockfile)
-npm ci          # oder: npm install
+# 2. Install dependencies (deterministic, from the lockfile)
+npm ci          # or: npm install
 
-# 3. Dev-Server starten
+# 3. Start the dev server
 npm run dev
 ```
 
-Anschließend [http://localhost:3000](http://localhost:3000) im Browser öffnen.
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Build & Deployment
 
-Die App ist vollständig clientseitig und wird als **statischer Export**
-(`output: "export"`) gebaut — es gibt keinen Node-Server im Betrieb.
+The app is entirely client-side and is built as a **static export**
+(`output: "export"`). There is no Node server in production.
 
 ```bash
-# Produktions-Build erzeugen → schreibt nach out/
+# Create the production build → writes to out/
 npm run build
 ```
 
-Das Ergebnis liegt anschließend im Ordner `out/` (statisches HTML/JS/CSS) und
-kann von jedem beliebigen Static-Host ausgeliefert werden — z. B. netcup Shared
-Hosting per FTP. Die Sicherheits-Header werden dabei über
-[`public/.htaccess`](public/.htaccess) (Apache) gesetzt, das beim Build nach
-`out/` kopiert wird.
+The result then sits in the `out/` folder (static HTML/JS/CSS) and can be
+served by any static host, e.g. netcup shared hosting via FTP. The security
+headers are set via [`public/.htaccess`](public/.htaccess) (Apache), which is
+copied into `out/` on build.
 
-Zum lokalen Prüfen des Builds genügt ein beliebiger Static-Server, z. B.:
+To check the build locally, any static server will do, e.g.:
 
 ```bash
 npx serve out
 ```
 
-## npm-Scripts
+## npm scripts
 
-| Script                 | Beschreibung                                            |
-| ---------------------- | ------------------------------------------------------- |
-| `npm run dev`          | Startet den Next.js-Entwicklungsserver (Port 3000)      |
-| `npm run build`        | Erstellt den statischen Produktions-Build nach `out/`   |
-| `npm run start`        | (bei `output: "export"` nicht genutzt — siehe Build)    |
-| `npm run lint`         | ESLint                                                  |
-| `npm run typecheck`    | `next typegen` + TypeScript-Typprüfung (`tsc --noEmit`) |
-| `npm run format`       | Prettier — formatiert alle Dateien                      |
-| `npm run format:check` | Prettier — prüft Formatierung ohne Änderungen           |
-| `npm test`             | Führt die Test-Suite aus (Vitest, einmalig)             |
-| `npm run test:watch`   | Vitest im Watch-Modus                                   |
-| `npm run check`        | Alles zusammen: Lint + Typecheck + Format-Check + Tests |
+| Script                 | Description                                                 |
+| ---------------------- | ----------------------------------------------------------- |
+| `npm run dev`          | Starts the Next.js development server (port 3000)           |
+| `npm run build`        | Creates the static production build in `out/`               |
+| `npm run start`        | (not used with `output: "export"`, see Build)               |
+| `npm run lint`         | ESLint                                                      |
+| `npm run typecheck`    | `next typegen` + TypeScript type check (`tsc --noEmit`)     |
+| `npm run format`       | Prettier: formats all files                                 |
+| `npm run format:check` | Prettier: checks formatting without making changes          |
+| `npm test`             | Runs the test suite (Vitest, single run)                    |
+| `npm run test:watch`   | Vitest in watch mode                                        |
+| `npm run check`        | Everything at once: lint + typecheck + format check + tests |
 
-Vor einem Commit empfiehlt sich `npm run check`.
+Running `npm run check` before a commit is recommended.
 
-## Tech-Stack
+## Tech stack
 
 - **[Next.js](https://nextjs.org) 16** (App Router) + **React 19** + **TypeScript**
-- **[Tailwind CSS v4](https://tailwindcss.com)** mit shadcn-/[Base UI](https://base-ui.com)-Komponenten
-- **[Zustand](https://zustand.docs.pmnd.rs) 5** für State, **[zundo](https://github.com/charkour/zundo)** für Undo/Redo
-- **[idb-keyval](https://github.com/jakearchibald/idb-keyval)** für IndexedDB-Persistenz
-- **Canvas 2D** für das Rendering, **[JSZip](https://stuk.github.io/jszip/)** + **file-saver** für den Export
-- **[Vitest](https://vitest.dev)** + Testing Library + `jsdom` + `fake-indexeddb` für Tests
+- **[Tailwind CSS v4](https://tailwindcss.com)** with shadcn/[Base UI](https://base-ui.com) components
+- **[Zustand](https://zustand.docs.pmnd.rs) 5** for state, **[zundo](https://github.com/charkour/zundo)** for undo/redo
+- **[idb-keyval](https://github.com/jakearchibald/idb-keyval)** for IndexedDB persistence
+- **Canvas 2D** for rendering, **[JSZip](https://stuk.github.io/jszip/)** + **file-saver** for export
+- **[Vitest](https://vitest.dev)** + Testing Library + `jsdom` + `fake-indexeddb` for tests
 
-## Projektstruktur
+## Project structure
 
 ```
 src/
   app/                 # Next.js App Router
-    page.tsx           # /         – Galerie (Ordner & Projekte)
-    project/           # /project  – Editor, Projekt-Id als ?id=…
-    captions/          # /captions – Texte eines Releases, Ordner-Id als ?folder=…
-    manifest.ts        # PWA-Manifest
+    page.tsx           # /         : Gallery (folders & projects)
+    project/           # /project  : Editor, project id as ?id=…
+    captions/          # /captions : Texts of a release, folder id as ?folder=…
+    manifest.ts        # PWA manifest
   components/
-    captions/          # Caption-Raster über ein ganzes Release
-    editor/            # Canvas, Sidebar, Topbar, Shot-Karten
-    gallery/           # Ordner- & Projektkarten, Dialoge, Mehrfachauswahl
-    ui/                # wiederverwendbare UI-Primitives
+    captions/          # Caption grid across a whole release
+    editor/            # Canvas, sidebar, topbar, shot cards
+    gallery/           # Folder & project cards, dialogs, multi-select
+    ui/                # Reusable UI primitives
   lib/
-    model/             # Domänentypen, Presets, Limits, Versionen, Locales
-    render/            # Canvas-Rendering & Export
-    storage/           # IndexedDB, Bild-Store, .studio-Dateien, Upload
-  store/               # Zustand-Store (Projekte, Ordner, Undo/Redo)
+    model/             # Domain types, presets, limits, versions, locales
+    render/            # Canvas rendering & export
+    storage/           # IndexedDB, image store, .studio files, upload
+  store/               # Zustand store (projects, folders, undo/redo)
 ```
 
-Mehr zu Schichten und Abhängigkeitsrichtung in
+More on layers and dependency direction in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-## Hinweis für die Weiterentwicklung
+## Note for further development
 
-Dieses Projekt nutzt eine Next.js-Version mit ggf. abweichenden APIs und
-Konventionen. Siehe [`AGENTS.md`](AGENTS.md) — die relevanten Guides liegen unter
-`node_modules/next/dist/docs/` und sollten vor Änderungen konsultiert werden.
+This project uses a Next.js version whose APIs and conventions may differ from
+what you know. See [`AGENTS.md`](AGENTS.md). The relevant guides are in
+`node_modules/next/dist/docs/` and should be consulted before making changes.
+
+## License
+
+Copyright (c) 2026 Pierre Sucker (Kivi Studio)
+
+Mocko is free software, licensed under the
+[GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+(see [`LICENSE`](LICENSE)). In short:
+
+- **Allowed:** read, modify and fork the code, self-host it, and use it
+  professionally, including for screenshots of commercial apps.
+- **Required:** if you distribute a modified version, or offer one to others
+  over a network (e.g. host your own fork publicly), you must make its complete
+  source code available under the same license.
+
+The network clause is the reason for choosing the AGPL over a permissive
+license: Mocko is meant to stay free, and any fork offered as a service has to
+stay open as well.

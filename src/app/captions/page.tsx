@@ -17,7 +17,7 @@ function Loading() {
 }
 
 // Like the editor route, the folder id travels in the query string
-// (`/captions/?folder=…`) so a single static page serves every folder — ids are
+// (`/captions/?folder=…`) so a single static page serves every folder. Ids are
 // created at runtime in the browser, so there is nothing to prebuild.
 function CaptionsView() {
   const folderId = useSearchParams().get("folder") ?? "";

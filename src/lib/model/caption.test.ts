@@ -14,8 +14,8 @@ const shot = (over: Partial<Shot> = {}): Shot => ({
 
 describe("captionFor", () => {
   it("returns the caption written for that language", () => {
-    const s = shot({ captions: { de: { claim: "Hallo", sub: "Welt" } } });
-    expect(captionFor(s, "de")).toEqual({ claim: "Hallo", sub: "Welt" });
+    const s = shot({ captions: { de: { claim: "Hello", sub: "World" } } });
+    expect(captionFor(s, "de")).toEqual({ claim: "Hello", sub: "World" });
   });
 
   it("reads an untranslated language as empty, not as an error", () => {

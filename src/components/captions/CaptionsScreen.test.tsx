@@ -72,7 +72,7 @@ describe("CaptionsScreen", () => {
     expect(
       screen.getByRole("columnheader", { name: /iPad \(de\)/ }),
     ).toBeVisible();
-    // Three rows — the longest project decides.
+    // Three rows: the longest project decides.
     expect(screen.getByText("Shot 3")).toBeVisible();
     expect(screen.queryByText("Shot 4")).toBeNull();
   });
@@ -161,7 +161,7 @@ describe("CaptionsScreen", () => {
     const user = userEvent.setup();
     const projects = [withShots("iPhone (de)", 1)];
     seed(projects);
-    // Seeding is itself a store write — discard it so only the typing counts.
+    // Seeding is itself a store write. Discard it so only the typing counts.
     useProjectStore.temporal.getState().clear();
     render(<Harness />);
 

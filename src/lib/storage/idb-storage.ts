@@ -7,11 +7,11 @@ import { createId } from "@/lib/utils";
  * A Zustand `persist` storage backed by IndexedDB (via idb-keyval).
  *
  * We use IndexedDB rather than localStorage because even without the
- * screenshots themselves — those live in `image-store` — a library of projects
+ * screenshots themselves (those live in `image-store`), a library of projects
  * exceeds the ~5 MB localStorage quota.
  *
  * This implements `PersistStorage` (not the string-based `StateStorage`), so
- * state is stored via structured clone without a JSON.stringify pass — with
+ * state is stored via structured clone without a JSON.stringify pass. With
  * multi-megabyte screenshots inline, serializing on every store change is the
  * difference between instant edits and visible jank. Writes are additionally
  * debounced and flushed when the tab is hidden or closed.
@@ -82,7 +82,7 @@ async function performWrite(name: string, value: unknown): Promise<void> {
     if (!lastWriteFailed) {
       lastWriteFailed = true;
       toast.error(
-        "Saving failed — changes may be lost when you close the tab (check available storage)",
+        "Saving failed. Changes may be lost when you close the tab (check available storage)",
       );
     }
   }

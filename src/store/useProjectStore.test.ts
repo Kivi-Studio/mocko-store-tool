@@ -229,7 +229,7 @@ describe("folders", () => {
     const f = store().createFolder("Release");
     const root = store().createProject("iPhone (de)");
     const inside = store().createProject("iPhone (de)", f);
-    // Same name, different folders — no " (2)" suffix.
+    // Same name, different folders: no " (2)" suffix.
     expect(store().projects[root].name).toBe("iPhone (de)");
     expect(store().projects[inside].name).toBe("iPhone (de)");
     // Within one folder it still uniquifies.
@@ -296,7 +296,7 @@ describe("languages", () => {
   it("adds a language, ignoring one it already has", () => {
     const id = store().createProject("P");
     store().addLanguage(id, { code: "de", label: "German" });
-    store().addLanguage(id, { code: "de", label: "Deutsch" });
+    store().addLanguage(id, { code: "de", label: "German (duplicate)" });
     expect(codes(id)).toEqual([LANG, "de"]);
   });
 
@@ -305,7 +305,7 @@ describe("languages", () => {
     store().addLanguage(id, { code: "de", label: "German" });
     store().addShots(id, LANG, ["en-img"]);
     store().setShotImage(id, shots(id)[0].id, "de", "de-img");
-    store().updateShotText(id, shots(id)[0].id, "de", { claim: "Hallo" });
+    store().updateShotText(id, shots(id)[0].id, "de", { claim: "Hello" });
 
     store().removeLanguage(id, "de");
 
@@ -618,7 +618,7 @@ describe("createFolderVersion", () => {
       keepCaptions: false,
     })!;
     expect(store().folders[v].name).toBe("Mocko 1.3.0 (2)");
-    // The original release is a snapshot — it must not change.
+    // The original release is a snapshot. It must not change.
     expect(img(p, 0)).toBe("data:a");
     expect(cap(p, 0).claim).toBe("Hi");
   });
@@ -670,7 +670,8 @@ describe("applyToProjects", () => {
       color: "#123456",
     });
     expect(store().projects[ipad].device.frameColor).toBe("#FF0000");
-    // A variant is defined by its preset and its screenshots — never overwritten.
+    // A variant is defined by its preset and its screenshots, which are never
+    // overwritten.
     expect(store().projects[ipad].presetId).toBe(DEFAULT_PRESET_ID);
     expect(shots(ipad).map((sh) => sh.images[LANG] ?? null)).toEqual(["i1"]);
   });
@@ -698,7 +699,7 @@ describe("applyToProjects", () => {
     const result = shots(play);
     expect(result).toHaveLength(4);
     expect(captionFor(result[0], LANG).claim).toBe("One");
-    // The 4th shot has no counterpart in the source — image and text survive.
+    // The 4th shot has no counterpart in the source. Image and text survive.
     expect(result[3].images[LANG]).toBe("p4");
     expect(captionFor(result[3], LANG).claim).toBe("");
   });

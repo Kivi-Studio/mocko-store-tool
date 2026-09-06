@@ -6,7 +6,7 @@ import type { Preset } from "@/lib/model/types";
  * Dimensions follow the current store requirements:
  * - App Store iPhone 6.9″/6.7″/6.5″ and iPad 13″ (PNG).
  * - Google Play phone and 10″ tablet screenshots plus the 1024×500 feature
- *   graphic (JPEG — Play recommends JPEG/24-bit PNG without alpha).
+ *   graphic (JPEG: Play recommends JPEG/24-bit PNG without alpha).
  */
 export const PRESETS: readonly Preset[] = [
   {

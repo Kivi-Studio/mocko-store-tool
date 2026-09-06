@@ -88,11 +88,11 @@ export function ApplyToSiblingsDialog({
           <div className="grid gap-3 rounded-lg border p-3">
             <Label className="gap-3">
               <Checkbox checked={design} onCheckedChange={setDesign} />
-              Design — background, text style and device
+              Design: background, text style and device
             </Label>
             <Label className="gap-3">
               <Checkbox checked={captions} onCheckedChange={setCaptions} />
-              Captions — claim and subtext, matched by position
+              Captions: claim and subtext, matched by position
             </Label>
             {captions && (
               <p className="text-muted-foreground text-xs">

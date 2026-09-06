@@ -10,8 +10,8 @@ const EN: Language = { code: "en", label: "English" };
 const FR: Language = { code: "fr", label: "French" };
 
 /**
- * A project as it arrives from an import: one language, and — since nothing is
- * inferred from the name — that language is the default one whatever the
+ * A project as it arrives from an import: one language, and since nothing is
+ * inferred from the name, that language is the default one whatever the
  * project actually holds.
  */
 function imported(

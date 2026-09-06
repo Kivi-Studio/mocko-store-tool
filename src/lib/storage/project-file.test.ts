@@ -359,7 +359,7 @@ describe("export deduplication", () => {
       (n) => n.startsWith("images/") && !zip.files[n].dir,
     );
 
-    // Two projects, the same screenshot — one entry, named by content id.
+    // Two projects, the same screenshot: one entry, named by content id.
     expect(images).toHaveLength(1);
     expect(images[0]).toBe(`images/${pngId}.png`);
   });

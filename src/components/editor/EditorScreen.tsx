@@ -17,7 +17,7 @@ export function EditorScreen({ project }: { project: Project }) {
   const selectedShot = project.shots.find((s) => s.id === selectedId) ?? null;
 
   // Which language the whole editor shows, App-Store-Connect style: one switch
-  // in the topbar, everything below follows. UI state only — never persisted.
+  // in the topbar, everything below follows. UI state only, never persisted.
   const defaultCode = project.languages[0]?.code ?? "";
   const [language, setLanguage] = useState(defaultCode);
   // A language removed (or a different project opened) falls back to the first.

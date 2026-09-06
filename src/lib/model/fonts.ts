@@ -2,7 +2,7 @@
  * Font choices for captions.
  *
  * The selected value is written straight into `CanvasRenderingContext2D.font`,
- * so — like colors — it is restricted to a known allowlist. An imported project
+ * so, like colors, it is restricted to a known allowlist. An imported project
  * that carries an unknown font string falls back to the default rather than
  * letting arbitrary text reach the canvas font shorthand.
  */

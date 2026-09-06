@@ -1,194 +1,212 @@
-# Architektur
+# Architecture
 
-Mocko ist eine reine Browser-App (kein Backend, keine Anmeldung) zum Erstellen
-von App-Store- und Google-Play-Screenshots. Alle Projektdaten liegen lokal in
-IndexedDB.
+Mocko is a pure browser app (no backend, no sign-in) for creating App Store and
+Google Play screenshots. All project data lives locally in IndexedDB.
 
-**Stack:** Next.js (App Router) · React · TypeScript · Zustand (State) ·
-Tailwind + shadcn/ui (UI) · Canvas 2D (Rendering/Export) · Vitest (Tests).
+**Stack:** Next.js (App Router) · React · TypeScript · Zustand (state) ·
+Tailwind + shadcn/ui (UI) · Canvas 2D (rendering/export) · Vitest (tests).
 
-## Ordnerstruktur
+## Folder structure
 
 ```
 src/
-├── app/            Routing & Framework-Konventionen (Next.js App Router)
-│   ├── layout.tsx, page.tsx          Root-Layout + Startseite (Galerie)
+├── app/            Routing & framework conventions (Next.js App Router)
+│   ├── layout.tsx, page.tsx          Root layout + start page (gallery)
 │   ├── error.tsx, global-error.tsx, not-found.tsx
 │   ├── manifest.ts, globals.css
-│   ├── project/{layout,page}.tsx      Editor (Projekt-Id als ?id=…)
-│   └── captions/{layout,page}.tsx     Caption-Raster (Ordner-Id als ?folder=…)
+│   ├── project/{layout,page}.tsx      Editor (project id as ?id=…)
+│   └── captions/{layout,page}.tsx     Caption grid (folder id as ?folder=…)
 │
-├── components/     Präsentation (React)
-│   ├── captions/   Feature „Alle Texte eines Releases"
-│   ├── editor/     Feature „Editor": Canvas, Sidebar, Topbar, Shots …
-│   ├── gallery/    Feature „Projektübersicht"
-│   └── ui/         wiederverwendbare Primitives (shadcn/ui)
+├── components/     Presentation (React)
+│   ├── captions/   Feature "all texts of a release"
+│   ├── editor/     Feature "editor": canvas, sidebar, topbar, shots …
+│   ├── gallery/    Feature "project overview"
+│   └── ui/         Reusable primitives (shadcn/ui)
 │
-├── lib/            Framework-freie Logik (keine React-Abhängigkeit)
-│   ├── model/      Domänenmodell & Regeln
-│   ├── render/     Canvas-/Pixel-Pipeline
-│   ├── storage/    Persistenz & Datei-IO
-│   └── utils.ts    generische Helfer (cn, createId, slugify …)
+├── lib/            Framework-free logic (no React dependency)
+│   ├── model/      Domain model & rules
+│   ├── render/     Canvas/pixel pipeline
+│   ├── storage/    Persistence & file I/O
+│   └── utils.ts    Generic helpers (cn, createId, slugify …)
 │
-└── store/          globaler State (Zustand)
-    ├── useProjectStore.ts   Projekte, Shots, Settings + Persistenz
-    └── useUndoGroup.ts      Undo-Gruppierung
+└── store/          Global state (Zustand)
+    ├── useProjectStore.ts   Projects, shots, settings + persistence
+    └── useUndoGroup.ts      Undo grouping
 ```
 
-Tests liegen **co-located** neben ihrem Modul (`foo.ts` → `foo.test.ts`).
+Tests are **co-located** next to their module (`foo.ts` → `foo.test.ts`).
 
-## Schichten & Abhängigkeitsrichtung
+## Layers & dependency direction
 
-Die Abhängigkeiten zeigen konsequent nach „innen" — UI und Store dürfen von
-`lib/` abhängen, `lib/` kennt weder React, den Store noch die Komponenten.
+Dependencies consistently point "inwards". UI and store may depend on `lib/`,
+while `lib/` knows neither React, the store nor the components.
 
 ```
 app/  ─┐
-store/ ─┼──►  lib/  ──►  (nur Browser-APIs & externe Pakete)
+store/ ─┼──►  lib/  ──►  (browser APIs & external packages only)
 comp/ ─┘
 ```
 
-- **`app/`** — nur Routing/Layout und das Verdrahten der Komponenten.
-- **`components/`** — Darstellung und Interaktion; holt Daten aus dem Store,
-  ruft Logik aus `lib/` auf. `ui/` ist rein präsentational.
-- **`store/`** — einzige Quelle der Wahrheit für Laufzeit-State; kapselt die
-  Persistenz über den Storage-Adapter.
-- **`lib/`** — reine, testbare Funktionen. Kein Zugriff auf React/Store/UI.
+- **`app/`:** only routing/layout and wiring up the components.
+- **`components/`:** presentation and interaction; reads data from the store,
+  calls logic from `lib/`. `ui/` is purely presentational.
+- **`store/`:** single source of truth for runtime state; encapsulates
+  persistence via the storage adapter.
+- **`lib/`:** pure, testable functions. No access to React/store/UI.
 
-## `lib/` im Detail
+## `lib/` in detail
 
-| Ordner     | Verantwortung                                                                                 | Module                                                                                  |
-| ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
-| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren        | `render`, `export`, `image`                                                             |
-| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung | `idb-storage`, `image-store`, `project-file`, `upload`                                  |
-| (root)     | framework-unabhängige Kleinteile                                                              | `utils`                                                                                 |
+| Folder     | Responsibility                                                                        | Modules                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `model/`   | domain types, presets and the validation/allowlist rules that constrain the model     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
+| `render/`  | turn a shot into pixels: draw the canvas, decode images, export PNG/JPEG              | `render`, `export`, `image`                                                             |
+| `storage/` | load/save: IndexedDB adapter, image store, `.studio` project files, upload validation | `idb-storage`, `image-store`, `project-file`, `upload`                                  |
+| (root)     | framework-independent odds and ends                                                   | `utils`                                                                                 |
 
-Abhängigkeitsrichtung innerhalb `lib/`: `storage/` und `render/` bauen auf
-`model/` auf, `model/` nur auf `utils`. Keine Zyklen zwischen den Gruppen.
+Dependency direction within `lib/`: `storage/` and `render/` build on `model/`,
+`model/` only on `utils`. No cycles between the groups.
 
-**Sicherheitsrelevant:** `color`, `fonts` und `limits` sind bewusst Allowlists
-bzw. Wertebereiche. Sie schützen sowohl den Editor als auch den Import fremder
-`.studio`-Dateien davor, unerlaubte Werte in inline-CSS oder den Canvas zu
-schleusen (z. B. `url(...)`-Injection über einen Farbstring).
+**Security-relevant:** `color`, `fonts` and `limits` are deliberately allowlists
+or value ranges. They protect both the editor and the import of `.studio` files
+from elsewhere against smuggling disallowed values into inline CSS or the canvas
+(e.g. `url(...)` injection via a color string).
 
-## Apps & Releases
+## Apps & releases
 
-Ein Ordner bündelt die Varianten _eines_ Releases — dieselbe App je Store,
-Geräteklasse und Sprache (`iPhone (de)`, `iPad (de)`, `Play (en)` …). Daraus
-folgen drei Regeln:
+A folder bundles the variants of _one_ release: the same app per store, device
+class and language (`iPhone (de)`, `iPad (de)`, `Play (en)` …). Three rules
+follow from that:
 
-- **Projektnamen sind pro Ordner eindeutig**, nicht global. Nur so ist die
-  Kopie eines Ordners eine echte Kopie und kein Satz `" (2)"`-Namen.
-- **`model/version`** zerlegt einen Ordnernamen in App-Name und Version
-  (`"Mocko 1.2.0"`), damit `createFolderVersion` den Ordner samt Projekten
-  unter `<App> X.Y.Z` kopieren kann — optional mit geleerten Screenshots,
-  Captions und Layout bleiben erhalten.
-- **`applyToProjects`** überträgt Design und/oder Captions von einer Variante
-  auf ihre Geschwister. Preset und Screenshots bleiben unangetastet — genau
-  sie machen eine Variante zur Variante.
+- **Project names are unique per folder**, not globally. Only then is the copy
+  of a folder a real copy rather than a set of `" (2)"` names.
+- **`model/version`** splits a folder name into app name and version
+  (`"Mocko 1.2.0"`) so that `createFolderVersion` can copy the folder with its
+  projects to `<App> X.Y.Z`, optionally with the screenshots cleared while
+  captions and layout are kept.
+- **`applyToProjects`** transfers design and/or captions from one variant to
+  its siblings. Preset and screenshots stay untouched. They are exactly what
+  makes a variant a variant.
 
-Über den Ordnern liegt eine **reine Ansichtsebene**, kein Modellkonstrukt:
-`groupFolders` fasst Ordner mit gleichem Schlüssel (`appName ?? geparste Basis`)
-zu einer App zusammen, ab zwei Mitgliedern. Ordner ohne Version haben ihren
-vollen Namen als Schlüssel und gruppieren daher nie versehentlich; `appName`
-ist die Ausnahme für Ordner, deren Name die Konvention nicht trägt. Die Galerie
-kennt damit drei Ebenen — Wurzel → App (`?app=`) → Release (`?folder=`) —
-ohne dass ein Ordner je einen Ordner enthält.
+Above the folders sits a **pure view layer**, not a model construct:
+`groupFolders` groups folders with the same key (`appName ?? parsed base`) into
+an app, from two members upwards. Folders without a version have their full
+name as key and therefore never group by accident; `appName` is the exception
+for folders whose name does not follow the convention. The gallery thus knows
+three levels, root → app (`?app=`) → release (`?folder=`), without a folder
+ever containing a folder.
 
-## Sprachen: ein Shot ist eine Position
+## Languages: a shot is a position
 
-Weil eine lokalisierte App pro Sprache anders aussieht, unterscheiden sich
-**Screenshot und Text**. Ein `Shot` ist deshalb nicht mehr „ein Bild mit
-Untertitel", sondern eine **Position** in der Store-Auflistung („das dritte
-Bild"), die jede Sprache mit ihrem eigenen Bild und Text füllt:
+Because a localized app looks different in every language, **screenshot and
+text** differ. A `Shot` is therefore no longer "an image with a caption" but a
+**position** in the store listing ("the third image") that every language
+fills with its own image and text:
 
 ```
 Shot.images:   Record<langCode, imageId | null>
 Shot.captions: Record<langCode, { claim, sub }>
-Project.languages: Language[]   // erste ist die Standardsprache
+Project.languages: Language[]   // the first one is the default language
 ```
 
-Die Geräte-Platzierung (`offX`/`offY`/`scale`) bleibt geteilt — sie ist eine
-Layout-Entscheidung über die Position, keine Übersetzung.
+Device placement (`offX`/`offY`/`scale`) stays shared. It is a layout decision
+about the position, not a translation.
 
-- **Lesen immer über `model/caption`** (`captionFor`, `imageIdFor`): ein noch
-  nicht gefüllter Eintrag fehlt schlicht, statt als Fehler aufzutreten.
-- **Der Editor kennt eine aktive Sprache** (`LanguageContext`, reiner UI-State):
-  eine Stelle zum Umschalten, Canvas, Karten und Uploads folgen.
-- **`addShots` füllt erst Lücken, dann hängt es an.** Den englischen Satz in ein
-  Projekt zu werfen, dessen deutscher schon steht, vervollständigt die
-  vorhandenen Positionen — statt eine zweite Reihe daneben zu legen.
-- **Export** schreibt bei mehreren Sprachen einen ZIP-Ordner je Sprache; der
-  Code steht zusätzlich im Dateinamen.
+- **Always read via `model/caption`** (`captionFor`, `imageIdFor`): an entry
+  that has not been filled yet is simply missing instead of showing up as an
+  error.
+- **The editor knows one active language** (`LanguageContext`, pure UI state):
+  one place to switch, and canvas, cards and uploads follow.
+- **`addShots` fills gaps first, then appends.** Dropping the English set into
+  a project whose German one is already in place completes the existing
+  positions instead of laying out a second row next to them.
+- **Export** writes one ZIP folder per language when there are several; the
+  code is also part of the file name.
 
-## Bilder liegen außerhalb des States
+## Images live outside the state
 
-Screenshots lagen früher als base64-Data-URLs **im** persistierten State. Das
-hatte zwei Kosten, die mit jedem aufgehobenen Release wuchsen: Jeder Autosave
-klonte und schrieb die gesamte Bibliothek, und jede Version legte ihre eigene
-Kopie unveränderter Screenshots ab.
+Screenshots used to live as base64 data URLs **inside** the persisted state.
+That had two costs, which grew with every release kept around: every autosave
+cloned and wrote the entire library, and every version stored its own copy of
+unchanged screenshots.
 
-`storage/image-store` speichert Bilder daher **inhaltsadressiert** in einer
-eigenen IndexedDB-Datenbank: Schlüssel ist der SHA-256 der Bytes, der Wert sind
-die Rohbytes plus Mime-Typ. Ein `Shot` hält nur noch `imageId`.
+`storage/image-store` therefore stores images **content-addressed** in a
+separate IndexedDB database: the key is the SHA-256 of the bytes, the value is
+the raw bytes plus MIME type. A `Shot` now only holds an `imageId`.
 
-- **Dedup fällt dabei ab.** Identische Bytes landen auf einem Eintrag — und in
-  der Praxis sind die Wiederholungen genau die Shots, die sich zwischen zwei
-  Releases nicht geändert haben.
-- **Auflösung** läuft über genau eine Stelle, `render/image.loadImageById`;
-  Objekt-URLs werden je Content-Id zwischengespeichert.
-- **`.studio`-Einträge heißen nach der Content-Id**, ein Bild wird also pro
-  Archiv einmal geschrieben. Beim Import kollabieren auch die Mehrfachkopien
-  älterer Archive. Screenshots sind bereits komprimiertes PNG/JPEG — Deflate
-  bringt nichts, Dedup ist der einzige Hebel auf die Archivgröße.
-- **Garbage Collection** nach der Hydration: was der State nicht mehr
-  referenziert, fliegt raus. Ein leerer State wird übersprungen — das ist
-  wahrscheinlicher ein fehlgeschlagener Ladevorgang als eine leere Bibliothek.
+- **Dedup comes for free.** Identical bytes end up in one entry, and in
+  practice the repetitions are exactly the shots that did not change between
+  two releases.
+- **Resolution** goes through exactly one place, `render/image.loadImageById`;
+  object URLs are cached per content id.
+- **`.studio` entries are named after the content id**, so an image is written
+  once per archive. On import, the duplicate copies in older archives collapse
+  as well. Screenshots are already compressed PNG/JPEG. Deflate gains nothing,
+  so dedup is the only lever on archive size.
+- **Garbage collection** after hydration: whatever the state no longer
+  references is thrown out. An empty state is skipped. That is more likely a
+  failed load than an empty library.
 
-## Statt Migrationen: exportieren und importieren
+## Instead of migrations: export and import
 
-Es gibt **keine** Persist-Migrationen. Der State liegt unter dem Schlüssel
-`mocko`, Version 1; was unter dem alten `screenshot-studio` liegt, bleibt
-physisch unangetastet liegen, statt verworfen zu werden.
+There are **no** persist migrations. The state lives under the key `mocko`,
+version 1; whatever lies under the old `screenshot-studio` stays physically
+untouched instead of being discarded.
 
-Der Weg über eine Modelländerung hinweg ist stattdessen **exportieren →
-importieren**. Der `.studio`-Reader liest die alten Formen ohnehin — ein Shot
-ohne `images`-Map gehört zur einzigen Sprache, ein Projekt ohne `languages`
-bekommt die Standardsprache — und liefert das aktuelle Modell. Er _ist_ der
-Migrator, und zwar einer, den man beliebig oft gegen eine Datei laufen lassen
-und prüfen kann, statt eines Einmalversuchs gegen die lebende Datenbank.
+The way across a model change is instead **export → import**. The `.studio`
+reader reads the old shapes anyway (a shot without an `images` map belongs to
+the only language, a project without `languages` gets the default language)
+and returns the current model. It _is_ the migrator, and one that can be run
+against a file and checked as often as you like, instead of a one-shot attempt
+against the live database.
 
-Das ist eine bewusste Entscheidung für eine App mit genau einem Nutzer: rund
-500 Zeilen Migrations-Maschinerie für einen Übergang, der einmal stattfindet,
-sind teurer als der Import-Schritt, den es ohnehin gibt.
+That is a deliberate decision for an app with exactly one user: around 500
+lines of migration machinery for a transition that happens once are more
+expensive than the import step, which exists anyway.
 
-## State & Persistenz
+The flip side: without a current backup, a library is gone after such a
+switch. That is why the gallery permanently reminds you of it
+(`BackupReminder`) as soon as a project exists, and offers the export right
+there. And so that restoring takes no detour, an import into an empty
+workspace does not ask the "merge or replace" question at all. Both would
+amount to the same thing there (`import-plan.ts`). The file can also be dropped
+anywhere on the gallery page (`BackupDropZone`); that runs through the same
+import path as the menu.
 
-- **Zustand** hält Projekte, Shots und alle Settings.
-- Persistiert wird über einen **IndexedDB-Adapter** (`storage/idb-storage.ts`),
-  eingehängt als Zustand-`persist`-Storage. Externe Writes (anderer Tab) werden
-  erkannt und übernommen.
-- Der Editor arbeitet immer gegen ein Projekt aus dem Store; Export und
-  Dateiformat sind reine `lib/`-Funktionen ohne State-Bezug.
+The counterpart is **Delete everything** in the Backup menu
+(`wipeWorkspace`): state, persisted copy, every stored image and the old
+`screenshot-studio` key go in one step. It is the only code path that touches
+that key, and it is deliberately not undoable: the images are gone, so a
+restored state would only point into the void. The empty state is written
+before the images are dropped, so another open tab picks it up instead of
+saving its stale copy back later.
 
-## Konventionen
+## State & persistence
 
-- **Pfad-Alias** `@/…` → `src/…` (kein `../../../`). Beispiel:
+- **Zustand** holds projects, shots and all settings.
+- Persistence goes through an **IndexedDB adapter** (`storage/idb-storage.ts`),
+  mounted as the Zustand `persist` storage. External writes (another tab) are
+  detected and adopted.
+- The editor always works against a project from the store; export and file
+  format are pure `lib/` functions with no reference to state.
+
+## Conventions
+
+- **Path alias** `@/…` → `src/…` (no `../../../`). Example:
   `@/lib/render/export`, `@/store/useProjectStore`.
-- **Feature-first:** neue UI gehört in einen Feature-Ordner unter
-  `components/<feature>/`; nur wirklich generische Primitives nach `ui/`.
-- **Logik gehört in `lib/`**, nicht in Komponenten — so bleibt sie ohne DOM
-  testbar. Neue Logik in den passenden Unterordner (`model`/`render`/`storage`).
-- **Client vs. Server:** interaktive Komponenten tragen `"use client"`; reine
-  Layout-/Routing-Dateien bleiben Server-Komponenten.
-- **Tests co-located** und mit Vitest ausgeführt (`npm test`).
+- **Feature-first:** new UI belongs in a feature folder under
+  `components/<feature>/`; only truly generic primitives go to `ui/`.
+- **Logic belongs in `lib/`**, not in components. That keeps it testable
+  without a DOM. New logic goes into the matching subfolder
+  (`model`/`render`/`storage`).
+- **Client vs. server:** interactive components carry `"use client"`; pure
+  layout/routing files stay server components.
+- **Tests co-located** and run with Vitest (`npm test`).
 
-## Nützliche Befehle
+## Useful commands
 
 ```bash
-npm run dev        # Dev-Server
-npm run build      # Produktions-Build
+npm run dev        # dev server
+npm run build      # production build
 npm run typecheck  # next typegen && tsc --noEmit
 npm run lint       # ESLint
 npm test           # Vitest

@@ -6,7 +6,10 @@ import {
   wrapText,
 } from "@/lib/render/render";
 
-/** A measurer where each character is 10px wide — makes wrapping predictable. */
+/**
+ * A measurer where each character is 10px wide, which makes wrapping
+ * predictable.
+ */
 const measurer = {
   measureText: (text: string) => ({ width: text.length * 10 }) as TextMetrics,
 };
@@ -139,7 +142,7 @@ describe("screenAspectFor", () => {
   });
 
   it("clamps an out-of-range image to the device bounds", () => {
-    // A square image would warp the phone frame — clamp up to the min aspect.
+    // A square image would warp the phone frame. Clamp up to the min aspect.
     expect(
       screenAspectFor("android-phone", { width: 1000, height: 1000 }),
     ).toBeCloseTo(1.7);

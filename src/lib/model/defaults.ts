@@ -37,8 +37,8 @@ export const DEFAULT_DEVICE: DeviceStyle = {
 };
 
 /**
- * A new shot position. `code` says which language the screenshot belongs to —
- * the other languages start empty and get filled in as the release comes
+ * A new shot position. `code` says which language the screenshot belongs to.
+ * The other languages start empty and get filled in as the release comes
  * together.
  */
 export function makeShot(imageId: string | null, code: string): Shot {

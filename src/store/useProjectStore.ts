@@ -40,8 +40,8 @@ type MoveDir = -1 | 1;
 
 /**
  * What a folder copy carries over from the source shots. Styling (background,
- * text, device) always comes along — it is the folder's design, not its
- * content — including a background image.
+ * text, device) always comes along (it is the folder's design, not its
+ * content), including a background image.
  */
 export type FolderCopyOptions = {
   /** Keep the screenshots; `false` leaves empty placeholders behind. */
@@ -52,7 +52,7 @@ export type FolderCopyOptions = {
 
 /** What {@link ProjectStore.applyToProjects} carries from one project to others. */
 export type ApplyOptions = {
-  /** Background, text and device styling — the look shared by a release. */
+  /** Background, text and device styling: the look shared by a release. */
   design: boolean;
   /**
    * Claim and subtext, matched by shot position. Shots the target does not
@@ -103,7 +103,7 @@ export type ProjectStore = {
   renameFolder: (id: string, name: string) => void;
   /**
    * Deep-copies a folder and every project inside it. The copies keep their
-   * source names — project names only need to be unique within their folder,
+   * source names: project names only need to be unique within their folder,
    * and the new folder starts out empty.
    */
   duplicateFolder: (id: string, name?: string) => string | null;
@@ -121,7 +121,7 @@ export type ProjectStore = {
   /**
    * Assigns a folder to an app explicitly, overriding the grouping derived from
    * its name; `null` restores the name-derived grouping. Folder names are left
-   * alone — this only changes which app a folder is filed under.
+   * alone. This only changes which app a folder is filed under.
    */
   setFolderApp: (id: string, appName: string | null) => void;
   /** Deletes a folder; its projects fall back to the root, they are not removed. */
@@ -141,7 +141,7 @@ export type ProjectStore = {
   moveProjectToFolder: (projectId: string, folderId: string | null) => void;
 
   /**
-   * Pushes one project's design and/or captions onto other projects — the way
+   * Pushes one project's design and/or captions onto other projects, the way
    * a finished master variant ("iPhone (de)") seeds its siblings. The export
    * preset and the screenshots themselves are never touched, since those are
    * exactly what makes a variant a variant. Returns how many projects changed.
@@ -160,7 +160,7 @@ export type ProjectStore = {
   addLanguage: (id: string, language: Language) => void;
   /**
    * Drops a language and everything filled in for it. The last remaining
-   * language is never removed — a project without one could hold nothing.
+   * language is never removed: a project without one could hold nothing.
    */
   removeLanguage: (id: string, code: string) => void;
   /** Moves a language to the front, making it the project's default. */
@@ -334,7 +334,7 @@ export const useProjectStore = create<ProjectStore>()(
 
         addProject: (project) => {
           set((s) => ({
-            // Imported projects always land at the root — their `folderId`
+            // Imported projects always land at the root: their `folderId`
             // (if any) refers to folders from another app instance.
             projects: {
               ...s.projects,
@@ -801,7 +801,7 @@ export const useProjectStore = create<ProjectStore>()(
           projectOrder: state.projectOrder,
           folders: state.folders,
           folderOrder: state.folderOrder,
-          // A persisted UI preference — restored across sessions.
+          // A persisted UI preference, restored across sessions.
           viewMode: state.viewMode,
         }),
       },
@@ -832,7 +832,7 @@ if (typeof window !== "undefined") {
 
     // Drop images nothing points at any more: deleting a release only removes
     // its projects, and an image may still be shared with another release.
-    // Skipped on an empty state — that is far more likely to be a failed load
+    // Skipped on an empty state: that is far more likely to be a failed load
     // than a genuinely empty library, and sweeping it would delete everything.
     const projects = state?.projects ?? {};
     if (Object.keys(projects).length > 0) {

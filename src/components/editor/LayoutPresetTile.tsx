@@ -21,7 +21,7 @@ const TILE_PX = 180;
  * Draws the store artboard (in the preset's aspect ratio, letterboxed inside a
  * square) with a mini device placed via the SAME math as the real render, so a
  * tile faithfully previews what the layout preset applies. Content that spills
- * past the artboard is clipped — exactly how the export crops it.
+ * past the artboard is clipped, exactly how the export crops it.
  */
 function drawTile(
   canvas: HTMLCanvasElement,

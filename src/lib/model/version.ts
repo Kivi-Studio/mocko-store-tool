@@ -1,7 +1,7 @@
 /**
  * Version handling for release folders.
  *
- * A release is a folder whose name carries the app version — `"Mocko 1.2.0"`.
+ * A release is a folder whose name carries the app version: `"Mocko 1.2.0"`.
  * Splitting that name into base + version lets "New version…" suggest the next
  * number instead of making you retype the whole name.
  */
@@ -112,7 +112,7 @@ export type FolderGroup<T extends FolderLike> = {
 
 /**
  * The app a folder belongs to: its explicit {@link FolderLike.appName}, else
- * the base of its name — `"Telly 1.3.0"` belongs to `"Telly"`.
+ * the base of its name (`"Telly 1.3.0"` belongs to `"Telly"`).
  */
 export function folderGroupKey(folder: FolderLike): string {
   const explicit = folder.appName?.trim();
@@ -142,7 +142,7 @@ function byVersionDesc(a: FolderLike, b: FolderLike): number {
  * "Marketing" folder stays a plain folder instead of becoming a one-member app
  * that costs an extra click. No special case is needed for folders without a
  * version: their key is their whole name, and folder names are unique, so they
- * can never group by accident — only an explicit `appName` pulls them in.
+ * can never group by accident. Only an explicit `appName` pulls them in.
  *
  * Groups keep the order in which their first member appeared; members are
  * sorted newest release first.

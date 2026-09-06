@@ -38,7 +38,7 @@ export function GalleryBreadcrumb({
   app: string | null;
   /** The open folder, or `null` at the root and in an app's version list. */
   folder: Folder | null;
-  /** The app's releases, newest first — empty when the folder has no app. */
+  /** The app's releases, newest first. Empty when the folder has no app. */
   versions: Folder[];
 }) {
   const appHref = app ? `/?app=${encodeURIComponent(app)}` : "/";

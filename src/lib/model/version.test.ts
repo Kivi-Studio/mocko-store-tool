@@ -43,7 +43,7 @@ describe("parseVersionedName", () => {
   });
 
   it("does not read a single trailing number as a version", () => {
-    // "Angry Birds 2" is a name, not version 2.0.0 — a dot is required.
+    // "Angry Birds 2" is a name, not version 2.0.0: a dot is required.
     expect(parseVersionedName("Angry Birds 2")).toEqual({
       base: "Angry Birds 2",
       version: null,

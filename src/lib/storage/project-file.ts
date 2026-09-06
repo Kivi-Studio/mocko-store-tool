@@ -83,8 +83,8 @@ export function isProjectFile(file: { name: string }): boolean {
  * screenshot and caption per language code. Files written before that held a
  * single unnamed language; they still import, as a one-language project.
  *
- *  - single project — `{ project: {...} }` (also the pre-v5 shape)
- *  - workspace — `{ folders: [...], projects: [...] }`, which can hold one
+ *  - single project: `{ project: {...} }` (also the pre-v5 shape)
+ *  - workspace: `{ folders: [...], projects: [...] }`, which can hold one
  *    project, a folder and its projects, a selection, or the entire local
  *    setup. Folders are referenced from projects by a bundle-local `ref` handle
  *    (resolved to fresh ids on import) so membership survives a round-trip.
@@ -258,7 +258,7 @@ export async function buildWorkspaceArchive(
   const idToRef = new Map(folders.map((f, i) => [f.id, `f${i}`]));
 
   // Shared across every project in the archive, so a screenshot used by six
-  // variants — or by three releases — is stored once.
+  // variants, or by three releases, is stored once.
   const written = new Set<string>();
   const manifestProjects = [];
   for (const project of projects) {
@@ -312,14 +312,9 @@ function boundedNumber(
 }
 
 /**
- * Re-embeds an archived image as a data URL. Returns null when the image is
- * missing, oversized, or not an allowed raster type — the mime from the
- * manifest is untrusted and must never reach the data URL unvalidated.
- */
-/**
  * Reads one image out of the archive into the image store and returns its
- * content id. Identical bytes from different entries — an older archive still
- * stores one copy per shot — collapse onto a single stored image.
+ * content id. Identical bytes from different entries (an older archive still
+ * stores one copy per shot) collapse onto a single stored image.
  */
 async function readArchiveImage(
   zip: JSZip,
@@ -430,8 +425,8 @@ function normalizeShotScale(raw: unknown): number | null {
 }
 
 /**
- * The languages a project is imported with: the ones the file names, or — for
- * a file written before languages existed — the default one.
+ * The languages a project is imported with: the ones the file names, or (for
+ * a file written before languages existed) the default one.
  *
  * Nothing is inferred from the project's name. A file from the
  * one-project-per-language era therefore arrives labelled with the default
@@ -554,9 +549,7 @@ async function parseArchive(
     typeof manifest.version === "number" &&
     manifest.version > PROJECT_VERSION
   ) {
-    throw new Error(
-      "This file was created with a newer version — please update",
-    );
+    throw new Error("This file needs a newer version of the app");
   }
 
   return { zip, manifest };

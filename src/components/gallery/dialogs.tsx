@@ -16,7 +16,7 @@ import {
 /**
  * Name dialog shared for creating and renaming projects: Enter submits, blank
  * names are ignored. When `takenNames` is given, a name already in that list is
- * rejected (submit disabled + inline hint) — used to keep names unique at
+ * rejected (submit disabled + inline hint), used to keep names unique at
  * creation. Pass the already-trimmed sibling names, excluding the current one
  * when renaming.
  */

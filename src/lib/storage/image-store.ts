@@ -17,7 +17,7 @@ import {
  *
  * - The persisted state stays small. The debounced autosave rewrites project
  *   metadata rather than every screenshot in the library on each change.
- * - A release that reuses a screenshot costs nothing — identical bytes collapse
+ * - A release that reuses a screenshot costs nothing. Identical bytes collapse
  *   onto one entry. In practice the repeats are exactly the shots that did not
  *   change between two versions.
  *
@@ -46,7 +46,7 @@ function imageStore(): UseStore | null {
   return store;
 }
 
-/** Hex SHA-256 of the given bytes — the content id an image is stored under. */
+/** Hex SHA-256 of the given bytes, the content id an image is stored under. */
 export async function hashBytes(bytes: Uint8Array): Promise<string> {
   // `bytes.buffer` may be a slice of a larger ArrayBuffer, so pass the view.
   const digest = await crypto.subtle.digest(
@@ -76,7 +76,7 @@ export function parseDataUrl(
 
 /**
  * Stores raw image bytes and returns their content id. Bytes already present
- * are not rewritten — that is where the deduplication happens.
+ * are not rewritten. That is where the deduplication happens.
  */
 export async function putImageBytes(
   bytes: Uint8Array,
@@ -115,7 +115,7 @@ export async function getImageBlob(id: string | null): Promise<Blob | null> {
  * Object URLs handed to `<img>`/`loadImage`, cached per content id.
  *
  * They are intentionally never revoked: a URL stays valid for the session, and
- * the cache is bounded by the number of distinct images actually rendered —
+ * the cache is bounded by the number of distinct images actually rendered,
  * far less than the whole library, which is what used to sit in memory as data
  * URLs regardless.
  */
@@ -142,7 +142,7 @@ export async function hasImage(id: string): Promise<boolean> {
 
 /**
  * Deletes every stored image whose id is not in `referenced`, and returns how
- * many went. Call it with the ids reachable from the whole state — an image is
+ * many went. Call it with the ids reachable from the whole state. An image is
  * shared across releases, so it may only go once the last one lets go.
  */
 export async function sweep(referenced: Iterable<string>): Promise<number> {

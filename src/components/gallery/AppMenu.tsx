@@ -19,7 +19,7 @@ import { NewVersionDialog } from "./NewVersionDialog";
 
 /**
  * Actions on an app tile. "New version…" starts from the app's newest release,
- * which is the entry point you actually want — you rarely branch a new version
+ * which is the entry point you actually want. You rarely branch a new version
  * off an old one.
  */
 export function AppMenu({
@@ -28,7 +28,7 @@ export function AppMenu({
   projectCount,
 }: {
   appKey: string;
-  /** The app's newest release — the source a new version copies from. */
+  /** The app's newest release: the source a new version copies from. */
   latest: Folder;
   projectCount: number;
 }) {

@@ -23,7 +23,7 @@ export function imageIdFor(shot: Shot, code: string): string | null {
 }
 
 /**
- * Every image id a set of projects still points at — the survivors of an image
+ * Every image id a set of projects still points at: the survivors of an image
  * store sweep. An image is shared across languages and releases, so it may only
  * go once the last reference to it has.
  */

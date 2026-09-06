@@ -9,7 +9,7 @@ import { captionFor, imageIdFor } from "@/lib/model/caption";
 
 /**
  * Renders one shot to a full-resolution canvas that is scaled down with CSS.
- * Images are decoded asynchronously (and cached), then drawn synchronously —
+ * Images are decoded asynchronously (and cached), then drawn synchronously,
  * so the preview pixels match the export exactly.
  */
 export function ShotCanvas({

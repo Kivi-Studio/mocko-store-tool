@@ -9,8 +9,8 @@ import type { Language, Project, Shot } from "@/lib/model/types";
  * holding both.
  *
  * Which project is which language is **stated by the caller, not inferred**.
- * Names are written in whatever way suited at the time — brackets, dashes,
- * copy suffixes — and a rule that reads them all correctly is a rule that will
+ * Names are written in whatever way suited at the time (brackets, dashes,
+ * copy suffixes), and a rule that reads them all correctly is a rule that will
  * eventually read one of them wrongly. Since this is a step taken once, saying
  * it outright is both simpler and safer than parsing it.
  */
@@ -22,7 +22,7 @@ export type MergePart = { project: Project; language: Language };
  * Re-keys one project's per-language content onto `code`.
  *
  * After an import every project carries the same default language code, so a
- * project's own key says nothing about what it holds — the caller's assignment
+ * project's own key says nothing about what it holds. The caller's assignment
  * does. A project that genuinely maintains several languages is passed through
  * untouched; there is nothing to reassign.
  */
@@ -66,7 +66,7 @@ export function mergeProjects(parts: MergePart[], name: string): Project {
   const shots: Shot[] = [];
   for (let i = 0; i < rowCount; i += 1) {
     // Layout belongs to the position, so it comes from the first part that
-    // actually has one — not from whichever translation happens to be first.
+    // actually has one, not from whichever translation happens to be first.
     const base = (parts.find((p) => p.project.shots[i]) ?? parts[0]).project
       .shots[i];
     const images: Shot["images"] = {};

@@ -19,8 +19,8 @@ import {
 /**
  * Files a folder under an app explicitly.
  *
- * Grouping normally comes from the folder name — "Telly 1.3.0" lands under
- * "Telly" — which covers the common case without any bookkeeping. This is the
+ * Grouping normally comes from the folder name ("Telly 1.3.0" lands under
+ * "Telly"), which covers the common case without any bookkeeping. This is the
  * escape hatch for the folders that do not follow the convention: leaving the
  * field empty restores the name-derived grouping.
  */
@@ -57,7 +57,7 @@ export function AssignAppDialog({
           <DialogTitle>Assign to app</DialogTitle>
           <DialogDescription>
             “{folder.name}” is currently filed under “{folderGroupKey(folder)}”.
-            Folders group by their name automatically — set this only when the
+            Folders group by their name automatically. Set this only when the
             name does not say which app it belongs to.
           </DialogDescription>
         </DialogHeader>
@@ -97,7 +97,7 @@ export function AssignAppDialog({
               </>
             ) : (
               <>
-                Empty — grouping falls back to the folder name, so this lands
+                Empty: grouping falls back to the folder name, so this lands
                 under <span className="text-foreground">{derived}</span>.
               </>
             )}

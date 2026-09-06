@@ -4,7 +4,7 @@
  * The model is intentionally flat: a Project holds one set of global styling
  * (preset/format, background, text, device), the languages it is maintained in,
  * and an ordered list of shot positions. Every shot shares the same global
- * styling, which keeps a store listing visually consistent — the only per-shot
+ * styling, which keeps a store listing visually consistent. The only per-shot
  * overrides are the device's position and (optionally) its size.
  *
  * One project therefore covers one store format in every language: the six
@@ -108,7 +108,7 @@ export type Caption = {
  * One position in a store listing, across every language.
  *
  * A localized app looks different per language, so both the screenshot and the
- * caption vary — the shot is the *position* ("the third screenshot"), and each
+ * caption vary. The shot is the *position* ("the third screenshot"), and each
  * language fills it with its own image and text. The device's placement is
  * shared: it is a layout decision about the position, not about a translation.
  *
@@ -156,7 +156,7 @@ export type Project = {
   device: DeviceStyle;
   /**
    * Languages this project maintains, in display order. Never empty; the first
-   * is the default — the one the editor opens on and a single-language export
+   * is the default, the one the editor opens on and a single-language export
    * uses.
    */
   languages: Language[];
@@ -164,7 +164,7 @@ export type Project = {
   shots: Shot[];
   /**
    * Owning folder id, or `null` when the project lives at the gallery root.
-   * Folders are a single flat level — a folder never contains another folder.
+   * Folders are a single flat level. A folder never contains another folder.
    */
   folderId: string | null;
 };
@@ -177,8 +177,8 @@ export type Folder = {
   updatedAt: number;
   /**
    * Explicit app membership, overriding the one derived from the folder name.
-   * Normally a release folder groups under the base of its name — "Telly 1.3.0"
-   * belongs to "Telly" — and this stays `null`. Set it to pull a folder whose
+   * Normally a release folder groups under the base of its name ("Telly 1.3.0"
+   * belongs to "Telly"), and this stays `null`. Set it to pull a folder whose
    * name does not follow that convention into an app anyway. Absent on folders
    * created before apps existed, hence optional.
    */

@@ -27,7 +27,7 @@ const DRAG_THRESHOLD = 3;
  * dragging. Dragging near an axis snaps the device to the center and shows a
  * pink guide line; the panel sliders follow because both read the same store.
  *
- * Guides are DOM overlays shown only while dragging — they never touch the
+ * Guides are DOM overlays shown only while dragging. They never touch the
  * canvas, so they never appear in the export.
  */
 export function ShotPreview({

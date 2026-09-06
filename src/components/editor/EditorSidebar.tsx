@@ -68,7 +68,7 @@ export function EditorSidebar({ project }: { project: Project }) {
 
   const preset = getPreset(project.presetId);
   // Text sizes are stored as a fraction of canvas width but shown as the pixels
-  // they resolve to in the chosen export format — a familiar, concrete unit
+  // they resolve to in the chosen export format: a familiar, concrete unit
   // that matches the pixels in the exported file exactly.
   const px = (v: number) => `${Math.round(preset.w * v)} px`;
 

@@ -67,7 +67,7 @@ export function ProjectMenu({ project }: { project: Project }) {
       return;
     }
     try {
-      // From the gallery there is no active language — take them all.
+      // From the gallery there is no active language. Take them all.
       await exportProjectZip(
         project,
         project.languages.map((l) => l.code),

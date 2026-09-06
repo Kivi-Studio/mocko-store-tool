@@ -47,12 +47,12 @@ describe("slugify", () => {
 
 describe("uniqueName", () => {
   it("returns the name unchanged when it is free", () => {
-    expect(uniqueName("Projekt 1", [])).toBe("Projekt 1");
-    expect(uniqueName("Projekt 1", ["Anderes"])).toBe("Projekt 1");
+    expect(uniqueName("Project 1", [])).toBe("Project 1");
+    expect(uniqueName("Project 1", ["Other"])).toBe("Project 1");
   });
 
   it('appends " (2)" on the first collision', () => {
-    expect(uniqueName("Projekt", ["Projekt"])).toBe("Projekt (2)");
+    expect(uniqueName("Project", ["Project"])).toBe("Project (2)");
   });
 
   it("skips suffixes that are already taken", () => {

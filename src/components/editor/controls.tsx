@@ -18,8 +18,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
  * A color swatch that opens a hex color picker in a popover. Free-text input is
- * kept locally while typing and only committed once it is a valid hex color —
- * values land in inline CSS and on the canvas, so anything else must never
+ * kept locally while typing and only committed once it is a valid hex color.
+ * Values land in inline CSS and on the canvas, so anything else must never
  * reach the store.
  */
 export function ColorField({

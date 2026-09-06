@@ -28,7 +28,7 @@ import {
 /**
  * Adds, removes and reorders the languages a project maintains.
  *
- * The first language is the default — the one the editor opens on — so
+ * The first language is the default (the one the editor opens on), so
  * promoting one is expressed as "make default" rather than as a drag handle.
  * The last remaining language cannot be removed: a project without one could
  * hold no screenshots at all.

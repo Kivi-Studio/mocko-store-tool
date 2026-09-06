@@ -23,7 +23,7 @@ import {
  * Picks the languages to export.
  *
  * Every chosen language gets every position, including ones it has no
- * screenshot for — dropping those would renumber the rest and quietly ship a
+ * screenshot for. Dropping those would renumber the rest and quietly ship a
  * short listing. So the gap is named here instead, before the ZIP is built.
  */
 export function ExportDialog({

@@ -20,7 +20,7 @@ export function FolderCard({
 }: {
   folder: Folder;
   projects: Project[];
-  /** Overrides the displayed name — inside an app this is the version. */
+  /** Overrides the displayed name. Inside an app this is the version. */
   label?: string;
 }) {
   const moveProjectToFolder = useProjectStore((s) => s.moveProjectToFolder);

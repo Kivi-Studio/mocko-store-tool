@@ -9,8 +9,8 @@ import type {
 /**
  * Canvas rendering for a single store image.
  *
- * Everything is drawn at the preset's full pixel resolution onto a 2D canvas —
- * the same code path feeds both the (CSS-scaled) live preview and the exported
+ * Everything is drawn at the preset's full pixel resolution onto a 2D canvas.
+ * The same code path feeds both the (CSS-scaled) live preview and the exported
  * file, so what you see is exactly what you get. Rendering is synchronous, so
  * images must be decoded beforehand and passed in.
  */

@@ -97,8 +97,8 @@ export async function exportShot(
  *
  * With more than one language the archive gets a folder per language, which is
  * the shape the stores expect for a localized listing. Every position is
- * exported for every language chosen, including ones with no screenshot yet —
- * dropping them would silently renumber the rest, so an incomplete language is
+ * exported for every language chosen, including ones with no screenshot yet.
+ * Dropping them would silently renumber the rest, so an incomplete language is
  * something the export dialog warns about rather than something this hides.
  */
 export async function exportProjectZip(

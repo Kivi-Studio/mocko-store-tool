@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Mocko",
     short_name: "Mocko",
     description:
-      "Design App Store & Google Play screenshots — device mockups, backgrounds, captions and PNG/JPEG export.",
+      "Design App Store & Google Play screenshots with device mockups, backgrounds, captions and PNG/JPEG export.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

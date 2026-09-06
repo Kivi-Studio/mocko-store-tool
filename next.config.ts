@@ -9,12 +9,12 @@ const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as {
 
 /**
  * The app is a fully client-side tool (IndexedDB, no backend), so it ships as a
- * static export (`out/`) that any static host can serve — e.g. netcup shared
+ * static export (`out/`) that any static host can serve, e.g. netcup shared
  * hosting via FTP.
  *
  * Note: `output: "export"` cannot send HTTP headers, so the security headers
- * that used to live in `headers()` here are served by the web server instead —
- * see `public/.htaccess` (Apache), which is copied into `out/` on build.
+ * that used to live in `headers()` here are served by the web server instead.
+ * See `public/.htaccess` (Apache), which is copied into `out/` on build.
  */
 const nextConfig: NextConfig = {
   output: "export",
