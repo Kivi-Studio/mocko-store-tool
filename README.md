@@ -12,7 +12,11 @@ lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
 - **Projekte & Ordner:** Ein Projekt ist ein Screenshot-Set für _ein_
   Store-Format (z. B. App Store · iPhone 6.9″). Ordner bündeln die Varianten
   eines Releases — Store × Geräteklasse × Sprache.
-- **Editor:** Screenshots hochladen, Claim und Subtext je Shot, Hintergrund
+- **Mehrsprachig:** Ein Projekt hält beliebig viele Sprachen — jede mit
+  eigenen Screenshots _und_ eigenen Texten, weil eine lokalisierte App pro
+  Sprache anders aussieht. Ein Umschalter im Editor, der Export schreibt einen
+  Ordner je Sprache.
+- **Editor:** Screenshots hochladen, Claim und Subtext je Position, Hintergrund
   (Solid/Gradient/Bild), Device-Frame, Layout-Presets; Position und Größe des
   Geräts je Shot.
 - **Releases versionieren:** Ordner duplizieren oder per **„Neue Version…"**
@@ -130,7 +134,7 @@ src/
     gallery/           # Ordner- & Projektkarten, Dialoge, Mehrfachauswahl
     ui/                # wiederverwendbare UI-Primitives
   lib/
-    model/             # Domänentypen, Presets, Limits, Versionen
+    model/             # Domänentypen, Presets, Limits, Versionen, Locales
     render/            # Canvas-Rendering & Export
     storage/           # IndexedDB, Bild-Store, .studio-Dateien, Upload
   store/               # Zustand-Store (Projekte, Ordner, Undo/Redo)

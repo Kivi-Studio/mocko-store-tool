@@ -6,7 +6,10 @@ import userEvent from "@testing-library/user-event";
 import { CaptionsScreen } from "@/components/captions/CaptionsScreen";
 import { useProjectStore } from "@/store/useProjectStore";
 import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
+import { captionFor } from "@/lib/model/caption";
 import type { Folder, Project } from "@/lib/model/types";
+
+const LANG = "en";
 
 const folder: Folder = makeFolder("Telly 1.3.0");
 
@@ -14,8 +17,8 @@ const folder: Folder = makeFolder("Telly 1.3.0");
 function withShots(name: string, n: number): Project {
   const p = makeProject(name, folder.id);
   p.shots = Array.from({ length: n }, (_, i) => ({
-    ...makeShot(null),
-    claim: `${name} ${i + 1}`,
+    ...makeShot(null, LANG),
+    captions: { [LANG]: { claim: `${name} ${i + 1}`, sub: "" } },
   }));
   return p;
 }
@@ -62,15 +65,31 @@ describe("CaptionsScreen", () => {
     seed(projects);
     render(<Harness />);
 
+    // The header carries the project and, beneath it, the language.
     expect(
-      screen.getByRole("columnheader", { name: "iPhone (de)" }),
+      screen.getByRole("columnheader", { name: /iPhone \(de\)/ }),
     ).toBeVisible();
     expect(
-      screen.getByRole("columnheader", { name: "iPad (de)" }),
+      screen.getByRole("columnheader", { name: /iPad \(de\)/ }),
     ).toBeVisible();
     // Three rows — the longest project decides.
     expect(screen.getByText("Shot 3")).toBeVisible();
     expect(screen.queryByText("Shot 4")).toBeNull();
+  });
+
+  it("gives a project with several languages one column each", () => {
+    const project = withShots("iPhone", 1);
+    project.languages = [
+      { code: "de", label: "German" },
+      { code: "en", label: "English" },
+    ];
+    seed([project]);
+    render(<Harness />);
+
+    // "Shot" plus one per language.
+    expect(screen.getAllByRole("columnheader")).toHaveLength(3);
+    expect(screen.getByLabelText("Claim, iPhone de, shot 1")).toBeVisible();
+    expect(screen.getByLabelText("Claim, iPhone en, shot 1")).toBeVisible();
   });
 
   it("shows each project's existing captions", () => {
@@ -78,9 +97,9 @@ describe("CaptionsScreen", () => {
     seed(projects);
     render(<Harness />);
 
-    expect(screen.getByLabelText("Claim, iPhone (de), shot 1")).toHaveValue(
-      "iPhone (de) 1",
-    );
+    expect(
+      screen.getByLabelText(`Claim, iPhone (de) ${LANG}, shot 1`),
+    ).toHaveValue("iPhone (de) 1");
   });
 
   it("writes an edit through to the right project and shot", async () => {
@@ -89,14 +108,16 @@ describe("CaptionsScreen", () => {
     seed(projects);
     render(<Harness />);
 
-    const field = screen.getByLabelText("Claim, iPad (de), shot 1");
+    const field = screen.getByLabelText(`Claim, iPad (de) ${LANG}, shot 1`);
     await user.clear(field);
     await user.type(field, "Alle Serien");
 
     const state = useProjectStore.getState();
-    expect(state.projects[projects[1].id].shots[0].claim).toBe("Alle Serien");
+    const edited = state.projects[projects[1].id].shots[0];
+    expect(captionFor(edited, LANG).claim).toBe("Alle Serien");
     // The neighbouring project is untouched.
-    expect(state.projects[projects[0].id].shots[0].claim).toBe("iPhone (de) 1");
+    const neighbour = state.projects[projects[0].id].shots[0];
+    expect(captionFor(neighbour, LANG).claim).toBe("iPhone (de) 1");
   });
 
   it("edits the subtext independently of the claim", async () => {
@@ -106,13 +127,15 @@ describe("CaptionsScreen", () => {
     render(<Harness />);
 
     await user.type(
-      screen.getByLabelText("Subtext, iPhone (de), shot 1"),
+      screen.getByLabelText(`Subtext, iPhone (de) ${LANG}, shot 1`),
       "Nie wieder suchen",
     );
 
     const shot = useProjectStore.getState().projects[projects[0].id].shots[0];
-    expect(shot.sub).toBe("Nie wieder suchen");
-    expect(shot.claim).toBe("iPhone (de) 1");
+    expect(captionFor(shot, LANG)).toEqual({
+      claim: "iPhone (de) 1",
+      sub: "Nie wieder suchen",
+    });
   });
 
   it("marks positions a shorter project does not have, without inventing a shot", () => {
@@ -121,8 +144,12 @@ describe("CaptionsScreen", () => {
     render(<Harness />);
 
     // Row 2 has a cell for the longer project and a placeholder for the shorter.
-    expect(screen.getByLabelText("Claim, iPhone (de), shot 2")).toBeVisible();
-    expect(screen.queryByLabelText("Claim, iPad (de), shot 2")).toBeNull();
+    expect(
+      screen.getByLabelText(`Claim, iPhone (de) ${LANG}, shot 2`),
+    ).toBeVisible();
+    expect(
+      screen.queryByLabelText(`Claim, iPad (de) ${LANG}, shot 2`),
+    ).toBeNull();
     expect(screen.getByText("no shot")).toBeVisible();
     // Nothing was added to the store just by looking at it.
     expect(
@@ -138,7 +165,10 @@ describe("CaptionsScreen", () => {
     useProjectStore.temporal.getState().clear();
     render(<Harness />);
 
-    await user.type(screen.getByLabelText("Claim, iPhone (de), shot 1"), "abc");
+    await user.type(
+      screen.getByLabelText(`Claim, iPhone (de) ${LANG}, shot 1`),
+      "abc",
+    );
 
     expect(useProjectStore.temporal.getState().pastStates.length).toBe(1);
   });
@@ -154,6 +184,8 @@ describe("CaptionsScreen", () => {
     seed(projects);
     render(<Harness />);
     const header = screen.getByRole("banner");
-    expect(within(header).getByText(/2 projects · 5 captions/)).toBeVisible();
+    expect(
+      within(header).getByText(/2 projects · 2 columns · 5 captions/),
+    ).toBeVisible();
   });
 });

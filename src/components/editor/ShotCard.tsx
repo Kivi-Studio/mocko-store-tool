@@ -17,6 +17,8 @@ import { fileToImageId } from "@/lib/storage/upload";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import { ShotPreview } from "./ShotPreview";
+import { useLanguage } from "./LanguageContext";
+import { captionFor, imageIdFor } from "@/lib/model/caption";
 import { Input } from "@/components/ui/input";
 
 /** Drag & drop wiring for reordering a card within the grid. */
@@ -53,16 +55,19 @@ export function ShotCard({
   const moveShot = useProjectStore((s) => s.moveShot);
   const removeShot = useProjectStore((s) => s.removeShot);
   const { group } = useUndoGroup();
+  const { language } = useLanguage();
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isFirst = index === 0;
   const isLast = index === project.shots.length - 1;
+  const caption = captionFor(shot, language);
+  const hasImage = imageIdFor(shot, language) !== null;
 
   const handleImageFile = async (file: File) => {
     try {
       const imageId = await fileToImageId(file);
-      setShotImage(project.id, shot.id, imageId);
+      setShotImage(project.id, shot.id, language, imageId);
     } catch {
       toast.error("Image skipped (unsupported type or too large)");
     }
@@ -71,7 +76,7 @@ export function ShotCard({
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportShot(project, shot, index);
+      await exportShot(project, shot, language, index);
     } catch (error) {
       console.error(error);
       toast.error("Export failed");
@@ -136,26 +141,30 @@ export function ShotCard({
         className="border-input text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors"
       >
         <ImageIcon className="size-4" />
-        {shot.imageId ? "Replace image" : "Choose image"}
+        {hasImage ? "Replace image" : "Choose image"}
       </button>
       <Input
-        value={shot.claim}
+        value={caption.claim}
         placeholder="Claim / headline"
         aria-label={`Claim for screenshot ${index + 1}`}
         className="font-medium"
         onChange={(e) =>
           group(() =>
-            updateShotText(project.id, shot.id, { claim: e.target.value }),
+            updateShotText(project.id, shot.id, language, {
+              claim: e.target.value,
+            }),
           )
         }
       />
       <Input
-        value={shot.sub}
+        value={caption.sub}
         placeholder="Subtext (optional)"
         aria-label={`Subtext for screenshot ${index + 1}`}
         onChange={(e) =>
           group(() =>
-            updateShotText(project.id, shot.id, { sub: e.target.value }),
+            updateShotText(project.id, shot.id, language, {
+              sub: e.target.value,
+            }),
           )
         }
       />

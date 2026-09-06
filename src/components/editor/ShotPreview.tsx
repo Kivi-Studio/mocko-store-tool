@@ -9,6 +9,7 @@ import { clamp, cn } from "@/lib/utils";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import { ShotCanvas } from "./ShotCanvas";
+import { useLanguage } from "./LanguageContext";
 
 type DragState = {
   startX: number;
@@ -41,6 +42,7 @@ export function ShotPreview({
   onSelect: (id: string) => void;
 }) {
   const updateShotLayout = useProjectStore((s) => s.updateShotLayout);
+  const { language } = useLanguage();
   const { group, end } = useUndoGroup();
   const wrapRef = useRef<HTMLDivElement>(null);
   const drag = useRef<DragState | null>(null);
@@ -108,6 +110,7 @@ export function ShotPreview({
       )}
     >
       <ShotCanvas
+        language={language}
         project={project}
         shot={shot}
         className="pointer-events-none block h-auto w-full rounded-md bg-black select-none"

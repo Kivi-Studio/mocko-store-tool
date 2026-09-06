@@ -9,7 +9,9 @@ import type { Project } from "@/lib/model/types";
 function withShots(name: string, n: number): Project {
   return {
     ...makeProject(name),
-    shots: Array.from({ length: n }, (_, i) => makeShot(`data:${name}-${i}`)),
+    shots: Array.from({ length: n }, (_, i) =>
+      makeShot(`data:${name}-${i}`, LANG),
+    ),
   };
 }
 
@@ -32,6 +34,8 @@ function renderDialog(
   );
   return { onSubmit, onOpenChange, project, siblings };
 }
+
+const LANG = "en";
 
 const apply = () => screen.getByRole("button", { name: /^Apply to/ });
 

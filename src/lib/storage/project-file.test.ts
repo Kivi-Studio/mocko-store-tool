@@ -13,11 +13,16 @@ import { makeFolder, makeProject } from "@/lib/model/defaults";
 import { MAX_SHOTS_PER_PROJECT } from "@/lib/model/limits";
 import type { Project } from "@/lib/model/types";
 import { putImageDataUrl } from "@/lib/storage/image-store";
+import { captionFor, imageIdFor } from "@/lib/model/caption";
+import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
 /** Content id of {@link PNG}, once it is in the image store. */
 let pngId: string;
+
+/** New projects start in the default language; the round-trips use it. */
+const LANG = DEFAULT_LANGUAGE.code;
 
 beforeAll(async () => {
   pngId = (await putImageDataUrl(PNG))!;
@@ -29,9 +34,8 @@ function sample(): Project {
   p.shots = [
     {
       id: "x",
-      imageId: pngId,
-      claim: "Hi",
-      sub: "There",
+      images: { [LANG]: pngId },
+      captions: { [LANG]: { claim: "Hi", sub: "There" } },
       offX: 0.1,
       offY: -0.2,
       scale: 0.8,
@@ -56,10 +60,12 @@ async function archiveFrom(
 describe("archive round-trip", () => {
   it("preserves the shot's caption text and image", async () => {
     const parsed = await readProjectFile(await buildProjectArchive(sample()));
-    expect(parsed.shots[0].claim).toBe("Hi");
-    expect(parsed.shots[0].sub).toBe("There");
+    expect(captionFor(parsed.shots[0], LANG)).toEqual({
+      claim: "Hi",
+      sub: "There",
+    });
     // Content addressing makes the id survive a round-trip exactly.
-    expect(parsed.shots[0].imageId).toBe(pngId);
+    expect(imageIdFor(parsed.shots[0], LANG)).toBe(pngId);
   });
 
   it("preserves per-shot device offset and size", async () => {
@@ -171,8 +177,11 @@ describe("import validation", () => {
       },
     });
     const parsed = await readProjectFile(blob);
-    expect(parsed.shots[0]).toMatchObject({ claim: "Keep", sub: "" });
-    expect(parsed.shots[1]).toMatchObject({ claim: "", sub: "" });
+    expect(captionFor(parsed.shots[0], LANG)).toEqual({
+      claim: "Keep",
+      sub: "",
+    });
+    expect(captionFor(parsed.shots[1], LANG)).toEqual({ claim: "", sub: "" });
   });
 
   it("falls back to defaults for unknown preset and bad colors", async () => {
@@ -250,8 +259,88 @@ describe("import validation", () => {
       { "images/a.svg": "AAAA", "images/b.png": "AAAA" },
     );
     const parsed = await readProjectFile(blob);
-    expect(parsed.shots[0].imageId).toBeNull();
-    expect(parsed.shots[1].imageId).toMatch(/^[0-9a-f]{64}$/);
+    expect(imageIdFor(parsed.shots[0], LANG)).toBeNull();
+    expect(imageIdFor(parsed.shots[1], LANG)).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe("language round-trip", () => {
+  it("carries several languages, each with its own screenshot and caption", async () => {
+    const p = makeProject("Telly", null, [
+      { code: "de", label: "German" },
+      { code: "en", label: "English" },
+    ]);
+    const other = (await putImageDataUrl("data:image/png;base64,QUJDRA=="))!;
+    p.shots = [
+      {
+        id: "x",
+        images: { de: pngId, en: other },
+        captions: {
+          de: { claim: "Alle Serien", sub: "" },
+          en: { claim: "All your shows", sub: "" },
+        },
+        offX: 0,
+        offY: 0,
+        scale: null,
+      },
+    ];
+
+    const parsed = await readProjectFile(await buildProjectArchive(p));
+
+    expect(parsed.languages.map((l) => l.code)).toEqual(["de", "en"]);
+    expect(imageIdFor(parsed.shots[0], "de")).toBe(pngId);
+    expect(imageIdFor(parsed.shots[0], "en")).toBe(other);
+    expect(captionFor(parsed.shots[0], "en").claim).toBe("All your shows");
+  });
+
+  it("reads a pre-language file as one project in the language its name names", async () => {
+    const blob = await archiveFrom(
+      {
+        format: PROJECT_FORMAT,
+        version: 5,
+        project: {
+          name: "Telly (iOS) (DE)",
+          shots: [
+            {
+              image: { path: "images/a.png", mime: "image/png" },
+              claim: "Alle Serien",
+              sub: "",
+            },
+          ],
+        },
+      },
+      { "images/a.png": "AAAA" },
+    );
+
+    const parsed = await readProjectFile(blob);
+
+    expect(parsed.languages).toEqual([{ code: "de", label: "German" }]);
+    expect(captionFor(parsed.shots[0], "de").claim).toBe("Alle Serien");
+    expect(imageIdFor(parsed.shots[0], "de")).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("falls back to the default language when the name says nothing", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: 5,
+      project: { name: "Marketing", shots: [] },
+    });
+    const parsed = await readProjectFile(blob);
+    expect(parsed.languages).toEqual([DEFAULT_LANGUAGE]);
+  });
+
+  it("drops languages with an unusable code", async () => {
+    const blob = await archiveFrom({
+      format: PROJECT_FORMAT,
+      version: PROJECT_VERSION,
+      project: {
+        name: "X",
+        languages: [{ code: "de", label: "German" }, { code: "!!" }, {}],
+        shots: [],
+      },
+    });
+    const parsed = await readProjectFile(blob);
+    expect(parsed.languages).toEqual([{ code: "de", label: "German" }]);
   });
 });
 
@@ -290,6 +379,8 @@ describe("export deduplication", () => {
     );
 
     const parsed = await readProjectFile(blob);
-    expect(parsed.shots[0].imageId).toBe(parsed.shots[1].imageId);
+    expect(imageIdFor(parsed.shots[0], LANG)).toBe(
+      imageIdFor(parsed.shots[1], LANG),
+    );
   });
 });

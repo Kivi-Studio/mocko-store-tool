@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import type { Folder, Project } from "@/lib/model/types";
+import type { Folder, Language, Project } from "@/lib/model/types";
+import { captionFor, imageIdFor } from "@/lib/model/caption";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUndoGroup } from "@/store/useUndoGroup";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,10 +14,19 @@ import { ShotThumb } from "./ShotThumb";
  * One project's caption for one shot position. Editing writes straight through
  * to the store; a burst of typing collapses into a single undo step.
  */
-function CaptionCell({ project, index }: { project: Project; index: number }) {
+function CaptionCell({
+  project,
+  language,
+  index,
+}: {
+  project: Project;
+  language: string;
+  index: number;
+}) {
   const updateShotText = useProjectStore((s) => s.updateShotText);
   const { group, end } = useUndoGroup();
   const shot = project.shots[index];
+  const caption = shot ? captionFor(shot, language) : null;
 
   if (!shot) {
     // A shorter project simply has nothing at this position. Typing here would
@@ -27,27 +37,32 @@ function CaptionCell({ project, index }: { project: Project; index: number }) {
     );
   }
 
+  const where = `${project.name} ${language}, shot ${index + 1}`;
   return (
     <div className="space-y-1">
       <Input
-        value={shot.claim}
+        value={caption!.claim}
         placeholder="Claim"
-        aria-label={`Claim, ${project.name}, shot ${index + 1}`}
+        aria-label={`Claim, ${where}`}
         onChange={(e) =>
           group(() =>
-            updateShotText(project.id, shot.id, { claim: e.target.value }),
+            updateShotText(project.id, shot.id, language, {
+              claim: e.target.value,
+            }),
           )
         }
         onBlur={end}
         className="h-8 font-medium"
       />
       <Input
-        value={shot.sub}
+        value={caption!.sub}
         placeholder="Subtext"
-        aria-label={`Subtext, ${project.name}, shot ${index + 1}`}
+        aria-label={`Subtext, ${where}`}
         onChange={(e) =>
           group(() =>
-            updateShotText(project.id, shot.id, { sub: e.target.value }),
+            updateShotText(project.id, shot.id, language, {
+              sub: e.target.value,
+            }),
           )
         }
         onBlur={end}
@@ -56,6 +71,9 @@ function CaptionCell({ project, index }: { project: Project; index: number }) {
     </div>
   );
 }
+
+/** One editable column: a project seen through one of its languages. */
+type Column = { project: Project; language: Language };
 
 /**
  * Every caption in a release, side by side.
@@ -75,12 +93,20 @@ export function CaptionsScreen({
   projects: Project[];
 }) {
   const rowCount = Math.max(0, ...projects.map((p) => p.shots.length));
-  const totalShots = projects.reduce((n, p) => n + p.shots.length, 0);
+  const columns: Column[] = projects.flatMap((project) =>
+    project.languages.map((language) => ({ project, language })),
+  );
+  const totalCaptions = columns.reduce((n, c) => n + c.project.shots.length, 0);
 
   /** The first screenshot at this position, for orientation in the row head. */
-  const thumbFor = (index: number) =>
-    projects.find((p) => p.shots[index]?.imageId)?.shots[index]?.imageId ??
-    null;
+  const thumbFor = (index: number) => {
+    for (const { project, language } of columns) {
+      const shot = project.shots[index];
+      const id = shot ? imageIdFor(shot, language.code) : null;
+      if (id) return id;
+    }
+    return null;
+  };
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -96,12 +122,13 @@ export function CaptionsScreen({
           <p className="truncate text-sm font-medium">{folder.name}</p>
           <p className="text-muted-foreground text-xs">
             {projects.length} {projects.length === 1 ? "project" : "projects"} ·{" "}
-            {totalShots} {totalShots === 1 ? "caption" : "captions"}
+            {columns.length} {columns.length === 1 ? "column" : "columns"} ·{" "}
+            {totalCaptions} {totalCaptions === 1 ? "caption" : "captions"}
           </p>
         </div>
       </header>
 
-      {projects.length === 0 || rowCount === 0 ? (
+      {columns.length === 0 || rowCount === 0 ? (
         <div className="text-muted-foreground flex flex-1 items-center justify-center py-24 text-sm">
           Nothing to caption yet — add screenshots to this release first.
         </div>
@@ -110,15 +137,22 @@ export function CaptionsScreen({
           <table className="border-separate border-spacing-0 text-sm">
             <thead>
               <tr>
-                <th className="bg-background sticky top-0 left-0 z-20 w-40 border-r border-b px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
+                <th
+                  scope="col"
+                  className="bg-background sticky top-0 left-0 z-20 w-40 border-r border-b px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase"
+                >
                   Shot
                 </th>
-                {projects.map((p) => (
+                {columns.map(({ project, language }) => (
                   <th
-                    key={p.id}
+                    key={`${project.id}:${language.code}`}
+                    scope="col"
                     className="bg-background sticky top-0 z-10 min-w-56 border-r border-b px-3 py-2 text-left font-medium"
                   >
-                    <span className="block truncate">{p.name}</span>
+                    <span className="block truncate">{project.name}</span>
+                    <span className="text-muted-foreground block truncate text-xs font-normal">
+                      {language.label}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -126,7 +160,10 @@ export function CaptionsScreen({
             <tbody>
               {Array.from({ length: rowCount }, (_, i) => (
                 <tr key={i}>
-                  <th className="bg-background sticky left-0 z-10 border-r border-b px-3 py-2 text-left align-top font-normal">
+                  <th
+                    scope="row"
+                    className="bg-background sticky left-0 z-10 border-r border-b px-3 py-2 text-left align-top font-normal"
+                  >
                     <span className="flex items-center gap-2">
                       <ShotThumb imageId={thumbFor(i)} />
                       <span className="text-muted-foreground text-xs">
@@ -134,12 +171,16 @@ export function CaptionsScreen({
                       </span>
                     </span>
                   </th>
-                  {projects.map((p) => (
+                  {columns.map(({ project, language }) => (
                     <td
-                      key={p.id}
+                      key={`${project.id}:${language.code}`}
                       className="border-r border-b px-3 py-2 align-top"
                     >
-                      <CaptionCell project={p} index={i} />
+                      <CaptionCell
+                        project={project}
+                        language={language.code}
+                        index={i}
+                      />
                     </td>
                   ))}
                 </tr>

@@ -2,9 +2,20 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore } from "@/store/useProjectStore";
 import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
 import { makeFolder, makeProject } from "@/lib/model/defaults";
+import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
+import { captionFor } from "@/lib/model/caption";
 
 const store = () => useProjectStore.getState();
 const shots = (id: string) => store().projects[id].shots;
+
+/** New projects start with the default language; the tests work in it. */
+const LANG = DEFAULT_LANGUAGE.code;
+/** The caption of one shot in the default language. */
+const cap = (projectId: string, i: number) =>
+  captionFor(shots(projectId)[i], LANG);
+/** The screenshot id of one shot in the default language. */
+const img = (projectId: string, i: number) =>
+  shots(projectId)[i].images[LANG] ?? null;
 
 beforeEach(() => {
   useProjectStore.setState({
@@ -36,75 +47,89 @@ describe("project CRUD", () => {
 
   it("duplicates a project with fresh, independent shots", () => {
     const id = store().createProject("Orig");
-    store().addShots(id, ["data:a"]);
+    store().addShots(id, LANG, ["data:a"]);
     const shotId = shots(id)[0].id;
-    store().updateShotText(id, shotId, { claim: "Hi" });
+    store().updateShotText(id, shotId, LANG, { claim: "Hi" });
     const copyId = store().duplicateProject(id)!;
     const copy = store().projects[copyId];
-    expect(copy.shots[0].claim).toBe("Hi");
+    expect(captionFor(copy.shots[0], LANG).claim).toBe("Hi");
     // Mutating the copy must not touch the original.
-    store().updateShotText(copyId, copy.shots[0].id, { claim: "X" });
-    expect(shots(id)[0].claim).toBe("Hi");
+    store().updateShotText(copyId, copy.shots[0].id, LANG, { claim: "X" });
+    expect(cap(id, 0).claim).toBe("Hi");
   });
 });
 
 describe("shots & captions", () => {
   it("adds shots with empty caption text", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["data:1"]);
-    expect(shots(id)[0]).toMatchObject({ claim: "", sub: "" });
+    store().addShots(id, LANG, ["data:1"]);
+    expect(cap(id, 0)).toEqual({ claim: "", sub: "" });
   });
 
   it("updates a shot's claim and subtext", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["data:1"]);
+    store().addShots(id, LANG, ["data:1"]);
     const shotId = shots(id)[0].id;
-    store().updateShotText(id, shotId, { claim: "Hello", sub: "World" });
-    expect(shots(id)[0]).toMatchObject({ claim: "Hello", sub: "World" });
+    store().updateShotText(id, shotId, LANG, { claim: "Hello", sub: "World" });
+    expect(cap(id, 0)).toEqual({ claim: "Hello", sub: "World" });
   });
 
   it("updates only the addressed shot's text", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a", "b"]);
+    store().addShots(id, LANG, ["a", "b"]);
     const first = shots(id)[0].id;
-    store().updateShotText(id, first, { claim: "Only me" });
-    expect(shots(id)[0].claim).toBe("Only me");
-    expect(shots(id)[1].claim).toBe("");
+    store().updateShotText(id, first, LANG, { claim: "Only me" });
+    expect(cap(id, 0).claim).toBe("Only me");
+    expect(cap(id, 1).claim).toBe("");
   });
 
   it("moves a shot within the list", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a", "b", "c"]);
+    store().addShots(id, LANG, ["a", "b", "c"]);
     const second = shots(id)[1];
     store().moveShot(id, second.id, -1);
-    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "a", "c"]);
+    expect(shots(id).map((s) => s.images[LANG] ?? null)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
   });
 
   it("reorders a shot from one index to another", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a", "b", "c", "d"]);
+    store().addShots(id, LANG, ["a", "b", "c", "d"]);
     // Move the first shot to the third slot.
     store().reorderShots(id, 0, 2);
-    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "c", "a", "d"]);
+    expect(shots(id).map((s) => s.images[LANG] ?? null)).toEqual([
+      "b",
+      "c",
+      "a",
+      "d",
+    ]);
     // Move it back towards the front.
     store().reorderShots(id, 2, 1);
-    expect(shots(id).map((s) => s.imageId)).toEqual(["b", "a", "c", "d"]);
+    expect(shots(id).map((s) => s.images[LANG] ?? null)).toEqual([
+      "b",
+      "a",
+      "c",
+      "d",
+    ]);
   });
 
   it("ignores out-of-range or no-op reorders", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a", "b"]);
+    store().addShots(id, LANG, ["a", "b"]);
     store().reorderShots(id, 0, 0);
     store().reorderShots(id, 0, 5);
     store().reorderShots(id, -1, 1);
-    expect(shots(id).map((s) => s.imageId)).toEqual(["a", "b"]);
+    expect(shots(id).map((s) => s.images[LANG] ?? null)).toEqual(["a", "b"]);
   });
 
   it("adds an empty shot with centered/global layout defaults", () => {
     const id = store().createProject("P");
     store().addEmptyShot(id);
     const shot = shots(id)[0];
-    expect(shot.imageId).toBeNull();
+    expect(shot.images[LANG] ?? null).toBeNull();
     expect(shot).toMatchObject({ offX: 0, offY: 0, scale: null });
   });
 
@@ -112,15 +137,15 @@ describe("shots & captions", () => {
     const id = store().createProject("P");
     store().addEmptyShot(id);
     const shotId = shots(id)[0].id;
-    store().setShotImage(id, shotId, "data:new");
-    expect(shots(id)[0].imageId).toBe("data:new");
-    store().setShotImage(id, shotId, null);
-    expect(shots(id)[0].imageId).toBeNull();
+    store().setShotImage(id, shotId, LANG, "data:new");
+    expect(img(id, 0)).toBe("data:new");
+    store().setShotImage(id, shotId, LANG, null);
+    expect(img(id, 0)).toBeNull();
   });
 
   it("patches only the addressed shot's layout", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a", "b"]);
+    store().addShots(id, LANG, ["a", "b"]);
     const first = shots(id)[0].id;
     store().updateShotLayout(id, first, { offX: 0.25, scale: 0.7 });
     expect(shots(id)[0]).toMatchObject({ offX: 0.25, offY: 0, scale: 0.7 });
@@ -130,7 +155,7 @@ describe("shots & captions", () => {
 
   it("undoes a layout change", () => {
     const id = store().createProject("P");
-    store().addShots(id, ["a"]);
+    store().addShots(id, LANG, ["a"]);
     const shotId = shots(id)[0].id;
     useProjectStore.temporal.getState().clear();
     store().updateShotLayout(id, shotId, { offX: 0.3 });
@@ -261,14 +286,103 @@ describe("folders", () => {
   });
 });
 
+describe("languages", () => {
+  const codes = (id: string) =>
+    store().projects[id].languages.map((l) => l.code);
+
+  it("adds a language, ignoring one it already has", () => {
+    const id = store().createProject("P");
+    store().addLanguage(id, { code: "de", label: "German" });
+    store().addLanguage(id, { code: "de", label: "Deutsch" });
+    expect(codes(id)).toEqual([LANG, "de"]);
+  });
+
+  it("removes a language along with everything filled in for it", () => {
+    const id = store().createProject("P");
+    store().addLanguage(id, { code: "de", label: "German" });
+    store().addShots(id, LANG, ["en-img"]);
+    store().setShotImage(id, shots(id)[0].id, "de", "de-img");
+    store().updateShotText(id, shots(id)[0].id, "de", { claim: "Hallo" });
+
+    store().removeLanguage(id, "de");
+
+    expect(codes(id)).toEqual([LANG]);
+    // No orphaned screenshot is left behind to keep an image alive.
+    expect(shots(id)[0].images).toEqual({ [LANG]: "en-img" });
+    expect(shots(id)[0].captions).toEqual({});
+  });
+
+  it("never removes the last language", () => {
+    const id = store().createProject("P");
+    store().removeLanguage(id, LANG);
+    expect(codes(id)).toEqual([LANG]);
+  });
+
+  it("promotes a language to the front to make it the default", () => {
+    const id = store().createProject("P");
+    store().addLanguage(id, { code: "de", label: "German" });
+    store().setDefaultLanguage(id, "de");
+    expect(codes(id)).toEqual(["de", LANG]);
+    // An unknown code changes nothing.
+    store().setDefaultLanguage(id, "fr");
+    expect(codes(id)).toEqual(["de", LANG]);
+  });
+});
+
+describe("addShots across languages", () => {
+  it("fills a language's empty positions before appending new ones", () => {
+    const id = store().createProject("P");
+    store().addLanguage(id, { code: "de", label: "German" });
+    store().addShots(id, LANG, ["en1", "en2", "en3"]);
+
+    // The German set arrives afterwards: it completes the three positions
+    // rather than starting a second, parallel run of them.
+    store().addShots(id, "de", ["de1", "de2", "de3"]);
+
+    expect(shots(id)).toHaveLength(3);
+    expect(shots(id).map((sh) => sh.images.de)).toEqual(["de1", "de2", "de3"]);
+    expect(shots(id).map((sh) => sh.images[LANG])).toEqual([
+      "en1",
+      "en2",
+      "en3",
+    ]);
+  });
+
+  it("appends whatever is left over once the gaps are filled", () => {
+    const id = store().createProject("P");
+    store().addLanguage(id, { code: "de", label: "German" });
+    store().addShots(id, LANG, ["en1", "en2"]);
+
+    store().addShots(id, "de", ["de1", "de2", "de3", "de4"]);
+
+    expect(shots(id)).toHaveLength(4);
+    expect(shots(id).map((sh) => sh.images.de)).toEqual([
+      "de1",
+      "de2",
+      "de3",
+      "de4",
+    ]);
+    // The extra positions have nothing in the other language yet.
+    expect(shots(id)[2].images[LANG]).toBeUndefined();
+  });
+
+  it("skips positions that language has already filled", () => {
+    const id = store().createProject("P");
+    store().addShots(id, LANG, ["a", "b"]);
+    store().addShots(id, LANG, ["c"]);
+    // Both slots are taken, so the third starts a new position.
+    expect(shots(id).map((sh) => sh.images[LANG])).toEqual(["a", "b", "c"]);
+  });
+});
+
 describe("duplicateFolder", () => {
   /** A folder with two named projects, the first carrying one captioned shot. */
   const seedRelease = () => {
     const f = store().createFolder("Mocko 1.2.0");
     const a = store().createProject("iPhone (de)", f);
     const b = store().createProject("iPad (de)", f);
-    store().addShots(a, ["data:a"]);
-    store().updateShotText(a, shots(a)[0].id, { claim: "Hi" });
+    store().addShots(a, LANG, ["data:a"]);
+    store().updateShotText(a, shots(a)[0].id, LANG, { claim: "Hi" });
     return { f, a, b };
   };
 
@@ -297,10 +411,10 @@ describe("duplicateFolder", () => {
 
     expect(copy.id).not.toBe(a);
     expect(copy.shots[0].id).not.toBe(shots(a)[0].id);
-    expect(copy.shots[0].claim).toBe("Hi");
+    expect(captionFor(copy.shots[0], LANG).claim).toBe("Hi");
 
-    store().updateShotText(copy.id, copy.shots[0].id, { claim: "X" });
-    expect(shots(a)[0].claim).toBe("Hi");
+    store().updateShotText(copy.id, copy.shots[0].id, LANG, { claim: "X" });
+    expect(cap(a, 0).claim).toBe("Hi");
   });
 
   it("defaults to a “copy” name and uniquifies it", () => {
@@ -334,8 +448,11 @@ describe("createFolderVersion", () => {
   const seed = () => {
     const f = store().createFolder("Mocko 1.2.0");
     const p = store().createProject("iPhone (de)", f);
-    store().addShots(p, ["data:a", "data:b"]);
-    store().updateShotText(p, shots(p)[0].id, { claim: "Hi", sub: "There" });
+    store().addShots(p, LANG, ["data:a", "data:b"]);
+    store().updateShotText(p, shots(p)[0].id, LANG, {
+      claim: "Hi",
+      sub: "There",
+    });
     store().updateShotLayout(p, shots(p)[0].id, { offX: 0.2, scale: 0.6 });
     return { f, p };
   };
@@ -352,11 +469,14 @@ describe("createFolderVersion", () => {
       keepCaptions: true,
     })!;
     expect(store().folders[v].name).toBe("Mocko 1.3.0");
-    expect(copiedShots(v).map((sh) => sh.imageId)).toEqual([
+    expect(copiedShots(v).map((sh) => sh.images[LANG] ?? null)).toEqual([
       "data:a",
       "data:b",
     ]);
-    expect(copiedShots(v)[0]).toMatchObject({ claim: "Hi", sub: "There" });
+    expect(captionFor(copiedShots(v)[0], LANG)).toEqual({
+      claim: "Hi",
+      sub: "There",
+    });
   });
 
   it("clears images but keeps captions, count and layout", () => {
@@ -367,13 +487,9 @@ describe("createFolderVersion", () => {
     })!;
     const copies = copiedShots(v);
     expect(copies).toHaveLength(2);
-    expect(copies.map((sh) => sh.imageId)).toEqual([null, null]);
-    expect(copies[0]).toMatchObject({
-      claim: "Hi",
-      sub: "There",
-      offX: 0.2,
-      scale: 0.6,
-    });
+    expect(copies.map((sh) => sh.images[LANG] ?? null)).toEqual([null, null]);
+    expect(copies[0]).toMatchObject({ offX: 0.2, scale: 0.6 });
+    expect(captionFor(copies[0], LANG)).toEqual({ claim: "Hi", sub: "There" });
   });
 
   it("clears captions but keeps images", () => {
@@ -382,11 +498,8 @@ describe("createFolderVersion", () => {
       keepImages: true,
       keepCaptions: false,
     })!;
-    expect(copiedShots(v)[0]).toMatchObject({
-      imageId: "data:a",
-      claim: "",
-      sub: "",
-    });
+    expect(copiedShots(v)[0].images[LANG]).toBe("data:a");
+    expect(captionFor(copiedShots(v)[0], LANG)).toEqual({ claim: "", sub: "" });
   });
 
   it("keeps the design, including a background image, when images are cleared", () => {
@@ -415,7 +528,8 @@ describe("createFolderVersion", () => {
     })!;
     expect(store().folders[v].name).toBe("Mocko 1.3.0 (2)");
     // The original release is a snapshot — it must not change.
-    expect(shots(p)[0]).toMatchObject({ imageId: "data:a", claim: "Hi" });
+    expect(img(p, 0)).toBe("data:a");
+    expect(cap(p, 0).claim).toBe("Hi");
   });
 
   it("ignores an unknown folder id", () => {
@@ -435,19 +549,21 @@ describe("applyToProjects", () => {
     const master = store().createProject("iPhone (de)", f);
     const ipad = store().createProject("iPad (de)", f);
     const play = store().createProject("Play (de)", f);
-    store().addShots(master, ["m1", "m2", "m3"]);
-    store().addShots(ipad, ["i1"]);
-    store().addShots(play, ["p1", "p2", "p3", "p4"]);
+    store().addShots(master, LANG, ["m1", "m2", "m3"]);
+    store().addShots(ipad, LANG, ["i1"]);
+    store().addShots(play, LANG, ["p1", "p2", "p3", "p4"]);
     store().patchSettings(master, {
       presetId: "ipad-13",
       background: { type: "solid", color: "#123456" },
       device: { ...store().projects[master].device, frameColor: "#FF0000" },
     });
-    store().updateShotText(master, shots(master)[0].id, {
+    store().updateShotText(master, shots(master)[0].id, LANG, {
       claim: "One",
       sub: "Sub one",
     });
-    store().updateShotText(master, shots(master)[2].id, { claim: "Three" });
+    store().updateShotText(master, shots(master)[2].id, LANG, {
+      claim: "Three",
+    });
     return { f, master, ipad, play };
   };
 
@@ -465,7 +581,7 @@ describe("applyToProjects", () => {
     expect(store().projects[ipad].device.frameColor).toBe("#FF0000");
     // A variant is defined by its preset and its screenshots — never overwritten.
     expect(store().projects[ipad].presetId).toBe(DEFAULT_PRESET_ID);
-    expect(shots(ipad).map((sh) => sh.imageId)).toEqual(["i1"]);
+    expect(shots(ipad).map((sh) => sh.images[LANG] ?? null)).toEqual(["i1"]);
   });
 
   it("appends placeholders when the source has more shots (variant B)", () => {
@@ -473,14 +589,16 @@ describe("applyToProjects", () => {
     store().applyToProjects(master, [ipad], { design: false, captions: true });
     const result = shots(ipad);
     expect(result).toHaveLength(3);
-    expect(result[0]).toMatchObject({
-      imageId: "i1",
+    expect(result[0].images[LANG]).toBe("i1");
+    expect(captionFor(result[0], LANG)).toEqual({
       claim: "One",
       sub: "Sub one",
     });
     // The two extra captions arrive as empty placeholders, ready for images.
-    expect(result[1]).toMatchObject({ imageId: null, claim: "" });
-    expect(result[2]).toMatchObject({ imageId: null, claim: "Three" });
+    expect(result[1].images[LANG] ?? null).toBeNull();
+    expect(captionFor(result[1], LANG).claim).toBe("");
+    expect(result[2].images[LANG] ?? null).toBeNull();
+    expect(captionFor(result[2], LANG).claim).toBe("Three");
   });
 
   it("leaves surplus target shots untouched", () => {
@@ -488,9 +606,10 @@ describe("applyToProjects", () => {
     store().applyToProjects(master, [play], { design: false, captions: true });
     const result = shots(play);
     expect(result).toHaveLength(4);
-    expect(result[0].claim).toBe("One");
+    expect(captionFor(result[0], LANG).claim).toBe("One");
     // The 4th shot has no counterpart in the source — image and text survive.
-    expect(result[3]).toMatchObject({ imageId: "p4", claim: "" });
+    expect(result[3].images[LANG]).toBe("p4");
+    expect(captionFor(result[3], LANG).claim).toBe("");
   });
 
   it("does not copy the design when only captions are selected", () => {

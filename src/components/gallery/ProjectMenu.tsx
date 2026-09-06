@@ -67,7 +67,11 @@ export function ProjectMenu({ project }: { project: Project }) {
       return;
     }
     try {
-      await exportProjectZip(project);
+      // From the gallery there is no active language — take them all.
+      await exportProjectZip(
+        project,
+        project.languages.map((l) => l.code),
+      );
       toast.success(`Exported ${count} screenshot(s) as ZIP`);
     } catch (error) {
       console.error(error);

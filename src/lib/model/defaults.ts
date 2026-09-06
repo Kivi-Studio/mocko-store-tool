@@ -2,10 +2,12 @@ import type {
   DeviceStyle,
   Folder,
   GradientBackground,
+  Language,
   Project,
   Shot,
   TextStyle,
 } from "@/lib/model/types";
+import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
 import { DEFAULT_PRESET_ID } from "@/lib/model/presets";
 import { DEFAULT_FONT } from "@/lib/model/fonts";
 import { createId } from "@/lib/utils";
@@ -34,12 +36,16 @@ export const DEFAULT_DEVICE: DeviceStyle = {
   topSpace: 0.26,
 };
 
-export function makeShot(imageId: string | null): Shot {
+/**
+ * A new shot position. `code` says which language the screenshot belongs to —
+ * the other languages start empty and get filled in as the release comes
+ * together.
+ */
+export function makeShot(imageId: string | null, code: string): Shot {
   return {
     id: createId(),
-    imageId,
-    claim: "",
-    sub: "",
+    images: imageId ? { [code]: imageId } : {},
+    captions: {},
     offX: 0,
     offY: 0,
     scale: null,
@@ -49,6 +55,7 @@ export function makeShot(imageId: string | null): Shot {
 export function makeProject(
   name: string,
   folderId: string | null = null,
+  languages: Language[] = [{ ...DEFAULT_LANGUAGE }],
 ): Project {
   const now = Date.now();
   return {
@@ -60,6 +67,7 @@ export function makeProject(
     background: { ...DEFAULT_BACKGROUND },
     text: { ...DEFAULT_TEXT },
     device: { ...DEFAULT_DEVICE },
+    languages,
     shots: [],
     folderId,
   };

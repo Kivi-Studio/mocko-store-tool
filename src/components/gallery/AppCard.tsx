@@ -46,6 +46,7 @@ export function AppCard({
                 <ShotCanvas
                   project={project}
                   shot={shot!}
+                  language={project.languages[0]?.code ?? ""}
                   className="h-auto max-h-full w-auto max-w-full rounded-sm shadow-sm"
                 />
               </div>

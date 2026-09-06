@@ -2,8 +2,10 @@ import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import type {
   Background,
+  Caption,
   DeviceStyle,
   Folder,
+  Language,
   Project,
   Shot,
   TextAlign,
@@ -12,6 +14,8 @@ import type {
 import { isPresetId } from "@/lib/model/presets";
 import { safeFont } from "@/lib/model/fonts";
 import { safeColor } from "@/lib/model/color";
+import { isValidLangCode, labelForCode } from "@/lib/model/locales";
+import { languageForProject } from "@/lib/storage/migrate-languages";
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_DEVICE,
@@ -31,6 +35,7 @@ import {
   GRADIENT_ANGLE_MIN,
   MAX_FOLDERS_PER_WORKSPACE,
   MAX_IMAGE_BYTES,
+  MAX_LANGUAGES_PER_PROJECT,
   MAX_MANIFEST_CHARS,
   MAX_PROJECT_FILE_BYTES,
   MAX_PROJECTS_PER_WORKSPACE,
@@ -46,7 +51,7 @@ import {
 } from "@/lib/model/limits";
 
 export const PROJECT_FORMAT = "screenshot-studio";
-export const PROJECT_VERSION = 5;
+export const PROJECT_VERSION = 6;
 export const PROJECT_FILE_EXT = ".studio";
 
 /**
@@ -61,6 +66,10 @@ export const PROJECT_FILE_EXT = ".studio";
  * lever on archive size.
  *
  * Two manifest shapes are read:
+ * Since v6 a project also carries its `languages`, and each shot keeps one
+ * screenshot and caption per language code. Files written before that held a
+ * single unnamed language; they still import, as a one-language project.
+ *
  *  - single project — `{ project: {...} }` (also the pre-v5 shape)
  *  - workspace — `{ folders: [...], projects: [...] }`, which can hold one
  *    project, a folder and its projects, a selection, or the entire local
@@ -77,9 +86,13 @@ type ManifestBackground =
   | { type: "image"; image: ImageRef };
 
 type ManifestShot = {
-  image: ImageRef;
-  claim: string;
-  sub: string;
+  /** v6+: one screenshot and caption per language code. */
+  images?: Record<string, ImageRef>;
+  captions?: Record<string, Caption>;
+  /** Pre-v6 single-language shape, still read. */
+  image?: ImageRef;
+  claim?: string;
+  sub?: string;
   offX: number;
   offY: number;
   scale: number | null;
@@ -92,6 +105,8 @@ type ManifestProject = {
   background: ManifestBackground;
   text: TextStyle;
   device: DeviceStyle;
+  /** v6+. Absent in older files, which held exactly one (unnamed) language. */
+  languages?: Language[];
   shots: ManifestShot[];
 };
 
@@ -170,14 +185,19 @@ async function writeProject(
       : bg;
 
   const shots: ManifestShot[] = await Promise.all(
-    project.shots.map(async (shot) => ({
-      image: await addImage(zip, shot.imageId, written),
-      claim: shot.claim,
-      sub: shot.sub,
-      offX: shot.offX,
-      offY: shot.offY,
-      scale: shot.scale,
-    })),
+    project.shots.map(async (shot) => {
+      const images: Record<string, ImageRef> = {};
+      for (const [code, imageId] of Object.entries(shot.images)) {
+        images[code] = await addImage(zip, imageId, written);
+      }
+      return {
+        images,
+        captions: shot.captions,
+        offX: shot.offX,
+        offY: shot.offY,
+        scale: shot.scale,
+      };
+    }),
   );
 
   return {
@@ -186,6 +206,7 @@ async function writeProject(
     background,
     text: project.text,
     device: project.device,
+    languages: project.languages,
     shots,
   };
 }
@@ -395,13 +416,79 @@ function normalizeShotScale(raw: unknown): number | null {
   return clamp(raw, DEVICE_SCALE_MIN, DEVICE_SCALE_MAX);
 }
 
-async function normalizeShot(zip: JSZip, raw: unknown): Promise<Shot> {
+/**
+ * The languages a project is imported with: the ones the file names, or — for
+ * a file written before languages existed — a single one guessed from the
+ * project's own name, the same way the local migration guesses it.
+ */
+function normalizeLanguages(raw: unknown, name: string): Language[] {
+  if (!Array.isArray(raw)) return [languageForProject(name)];
+  const languages: Language[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw.slice(0, MAX_LANGUAGES_PER_PROJECT)) {
+    const l = (entry ?? {}) as Record<string, unknown>;
+    if (!isValidLangCode(l.code) || seen.has(l.code)) continue;
+    seen.add(l.code);
+    languages.push({
+      code: l.code,
+      label:
+        typeof l.label === "string" && l.label.trim()
+          ? l.label.slice(0, CAPTION_MAX_LENGTH)
+          : labelForCode(l.code),
+    });
+  }
+  // A file that names no usable language still has to end up with one.
+  return languages.length ? languages : [languageForProject(name)];
+}
+
+async function normalizeShot(
+  zip: JSZip,
+  raw: unknown,
+  languages: Language[],
+): Promise<Shot> {
   const s = (raw ?? {}) as Record<string, unknown>;
+  const codes = languages.map((l) => l.code);
+
+  const images: Record<string, string | null> = {};
+  const captions: Record<string, Caption> = {};
+
+  if (s.images && typeof s.images === "object") {
+    // v6+: keyed by language. Entries for languages the project does not
+    // declare are dropped rather than resurrecting a language by the back door.
+    const rawImages = s.images as Record<string, unknown>;
+    for (const code of codes) {
+      if (code in rawImages) {
+        images[code] = await readArchiveImage(zip, rawImages[code]);
+      }
+    }
+  } else {
+    // Pre-v6: one unnamed screenshot, which belongs to the only language.
+    images[codes[0]] = await readArchiveImage(zip, s.image);
+  }
+
+  const rawCaptions =
+    s.captions && typeof s.captions === "object"
+      ? (s.captions as Record<string, unknown>)
+      : null;
+  if (rawCaptions) {
+    for (const code of codes) {
+      const c = (rawCaptions[code] ?? null) as Record<string, unknown> | null;
+      if (!c) continue;
+      captions[code] = {
+        claim: cappedString(c.claim),
+        sub: cappedString(c.sub),
+      };
+    }
+  } else {
+    const claim = cappedString(s.claim);
+    const sub = cappedString(s.sub);
+    if (claim || sub) captions[codes[0]] = { claim, sub };
+  }
+
   return {
     id: createId(),
-    imageId: await readArchiveImage(zip, s.image),
-    claim: cappedString(s.claim),
-    sub: cappedString(s.sub),
+    images,
+    captions,
     offX: boundedNumber(s.offX, 0, OFFSET_MIN, OFFSET_MAX),
     offY: boundedNumber(s.offY, 0, OFFSET_MIN, OFFSET_MAX),
     scale: normalizeShotScale(s.scale),
@@ -473,24 +560,28 @@ async function buildProjectFromRaw(
     ? raw.shots.slice(0, MAX_SHOTS_PER_PROJECT)
     : [];
 
+  const name =
+    typeof raw.name === "string" && raw.name.trim()
+      ? raw.name
+      : "Imported project";
+  const languages = normalizeLanguages(raw.languages, name);
+
   const [background, shots] = await Promise.all([
     normalizeBackground(zip, raw.background),
-    Promise.all(rawShots.map((s) => normalizeShot(zip, s))),
+    Promise.all(rawShots.map((s) => normalizeShot(zip, s, languages))),
   ]);
 
   const now = Date.now();
   return {
     id: createId(),
-    name:
-      typeof raw.name === "string" && raw.name.trim()
-        ? raw.name
-        : "Imported project",
+    name,
     createdAt: now,
     updatedAt: now,
     presetId: isPresetId(raw.presetId) ? raw.presetId : "ios-6-9",
     background,
     text: normalizeText(raw.text),
     device: normalizeDevice(raw.device),
+    languages,
     shots,
     folderId: null,
   };

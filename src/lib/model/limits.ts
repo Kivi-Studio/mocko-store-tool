@@ -46,6 +46,9 @@ export const GRADIENT_ANGLE_MAX = 360;
 /** Maximum length of a claim or subtext. */
 export const CAPTION_MAX_LENGTH = 2000;
 
+/** Maximum languages kept from a single imported project. */
+export const MAX_LANGUAGES_PER_PROJECT = 40;
+
 /** Maximum shots kept from a single imported project. */
 export const MAX_SHOTS_PER_PROJECT = 60;
 

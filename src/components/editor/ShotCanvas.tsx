@@ -5,6 +5,7 @@ import type { Project, Shot } from "@/lib/model/types";
 import { getPreset } from "@/lib/model/presets";
 import { drawShot } from "@/lib/render/render";
 import { loadImageById } from "@/lib/render/image";
+import { captionFor, imageIdFor } from "@/lib/model/caption";
 
 /**
  * Renders one shot to a full-resolution canvas that is scaled down with CSS.
@@ -14,23 +15,27 @@ import { loadImageById } from "@/lib/render/image";
 export function ShotCanvas({
   project,
   shot,
+  language,
   className,
 }: {
   project: Project;
   shot: Shot;
+  /** Which language's screenshot and caption to draw. */
+  language: string;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const preset = getPreset(project.presetId);
   const { background, text, device } = project;
   const bgImageId = background.type === "image" ? background.imageId : null;
-  const { claim, sub } = shot;
+  const { claim, sub } = captionFor(shot, language);
+  const imageId = imageIdFor(shot, language);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const [screenshot, backgroundImage] = await Promise.all([
-        loadImageById(shot.imageId),
+        loadImageById(imageId),
         loadImageById(bgImageId),
       ]);
       if (cancelled || !canvasRef.current) return;
@@ -57,7 +62,7 @@ export function ShotCanvas({
     text,
     device,
     bgImageId,
-    shot.imageId,
+    imageId,
     claim,
     sub,
     shot.offX,

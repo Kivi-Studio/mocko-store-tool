@@ -29,6 +29,7 @@ export function ProjectRow({
       <div className="bg-muted/40 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md p-1">
         {cover ? (
           <ShotCanvas
+            language={project.languages[0]?.code ?? ""}
             project={project}
             shot={cover}
             className="h-auto max-h-full w-auto max-w-full rounded-sm"

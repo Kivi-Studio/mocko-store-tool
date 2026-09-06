@@ -25,6 +25,7 @@ export function ProjectCard({
 
   const coverInner = cover ? (
     <ShotCanvas
+      language={project.languages[0]?.code ?? ""}
       project={project}
       shot={cover}
       className="h-auto max-h-full w-auto max-w-full rounded shadow-sm"

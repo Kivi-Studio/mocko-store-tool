@@ -129,9 +129,8 @@ describe("referencedImageIds", () => {
     const p = makeProject("P");
     p.shots = ids.map((imageId, i) => ({
       id: `s${i}`,
-      imageId,
-      claim: "",
-      sub: "",
+      images: { de: imageId },
+      captions: {},
       offX: 0,
       offY: 0,
       scale: null,
@@ -146,6 +145,24 @@ describe("referencedImageIds", () => {
       b: withShots(["two"]),
     });
     expect([...ids].sort()).toEqual(["bg", "one", "two"]);
+  });
+
+  it("collects every language's screenshot of a shot", () => {
+    const p = makeProject("P");
+    p.shots = [
+      {
+        id: "s0",
+        images: { de: "de-img", en: "en-img", fr: null },
+        captions: {},
+        offX: 0,
+        offY: 0,
+        scale: null,
+      },
+    ];
+    expect([...referencedImageIds({ a: p })].sort()).toEqual([
+      "de-img",
+      "en-img",
+    ]);
   });
 
   it("ignores an image background with no image chosen", () => {

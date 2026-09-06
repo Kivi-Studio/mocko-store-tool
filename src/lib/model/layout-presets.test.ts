@@ -3,14 +3,16 @@ import { LAYOUT_PRESETS, activeLayoutPreset } from "@/lib/model/layout-presets";
 import { makeShot } from "@/lib/model/defaults";
 import type { Shot } from "@/lib/model/types";
 
+const LANG = "en";
+
 const withLayout = (patch: Partial<Shot>): Shot => ({
-  ...makeShot(null),
+  ...makeShot(null, LANG),
   ...patch,
 });
 
 describe("activeLayoutPreset", () => {
   it("matches the centered preset for a fresh shot", () => {
-    expect(activeLayoutPreset(makeShot(null))?.id).toBe("centered");
+    expect(activeLayoutPreset(makeShot(null, LANG))?.id).toBe("centered");
   });
 
   it("matches a preset when all three values line up", () => {

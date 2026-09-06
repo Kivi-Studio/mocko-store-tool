@@ -4,6 +4,7 @@ import type { Project, Shot } from "@/lib/model/types";
 import { getPreset } from "@/lib/model/presets";
 import { drawShot } from "@/lib/render/render";
 import { loadImageById } from "@/lib/render/image";
+import { captionFor, imageIdFor } from "@/lib/model/caption";
 import { slugify } from "@/lib/utils";
 
 const JPEG_QUALITY = 0.95;
@@ -15,27 +16,33 @@ function extFor(fileType: "png" | "jpeg"): string {
 
 /**
  * Builds a sortable, descriptive filename:
- * `<project>_<preset>_<NN>.<ext>` (1-based, zero-padded index).
+ * `<project>_<preset>_<language>_<NN>.<ext>` (1-based, zero-padded index).
+ *
+ * The language code is part of the name, not only of the enclosing folder, so
+ * files stay identifiable once they are uploaded or moved around.
  */
 export function exportFileName(
   projectName: string,
   presetId: string,
+  language: string,
   fileType: "png" | "jpeg",
   index: number,
 ): string {
   const nn = String(index + 1).padStart(2, "0");
-  return `${slugify(projectName)}_${presetId}_${nn}.${extFor(fileType)}`;
+  const parts = [slugify(projectName), presetId, slugify(language), nn];
+  return `${parts.join("_")}.${extFor(fileType)}`;
 }
 
 /** Renders a single shot at full resolution to a Blob. */
 export async function renderShotToBlob(
   project: Project,
   shot: Shot,
+  language: string,
 ): Promise<Blob> {
   const preset = getPreset(project.presetId);
-  const { claim, sub } = shot;
+  const { claim, sub } = captionFor(shot, language);
   const [screenshot, backgroundImage] = await Promise.all([
-    loadImageById(shot.imageId),
+    loadImageById(imageIdFor(shot, language)),
     loadImageById(
       project.background.type === "image" ? project.background.imageId : null,
     ),
@@ -70,30 +77,58 @@ export async function renderShotToBlob(
   });
 }
 
-/** Exports one shot as a downloaded PNG/JPEG. */
+/** Exports one shot, in one language, as a downloaded PNG/JPEG. */
 export async function exportShot(
   project: Project,
   shot: Shot,
+  language: string,
   index: number,
 ): Promise<void> {
   const preset = getPreset(project.presetId);
-  const blob = await renderShotToBlob(project, shot);
-  saveAs(blob, exportFileName(project.name, preset.id, preset.fileType, index));
+  const blob = await renderShotToBlob(project, shot, language);
+  saveAs(
+    blob,
+    exportFileName(project.name, preset.id, language, preset.fileType, index),
+  );
 }
 
-/** Exports every shot of a project into a single downloaded ZIP archive. */
-export async function exportProjectZip(project: Project): Promise<void> {
+/**
+ * Exports a project into a single downloaded ZIP.
+ *
+ * With more than one language the archive gets a folder per language, which is
+ * the shape the stores expect for a localized listing. Every position is
+ * exported for every language chosen, including ones with no screenshot yet —
+ * dropping them would silently renumber the rest, so an incomplete language is
+ * something the export dialog warns about rather than something this hides.
+ */
+export async function exportProjectZip(
+  project: Project,
+  languages: string[],
+): Promise<void> {
   const preset = getPreset(project.presetId);
+  const codes = languages.length
+    ? languages
+    : [project.languages[0]?.code ?? ""];
+  const perLanguageFolders = codes.length > 1;
   const zip = new JSZip();
 
-  for (let i = 0; i < project.shots.length; i += 1) {
-    let blob: Blob;
-    try {
-      blob = await renderShotToBlob(project, project.shots[i]);
-    } catch (cause) {
-      throw new Error(`Export of shot ${i + 1} failed`, { cause });
+  for (const code of codes) {
+    for (let i = 0; i < project.shots.length; i += 1) {
+      let blob: Blob;
+      try {
+        blob = await renderShotToBlob(project, project.shots[i], code);
+      } catch (cause) {
+        throw new Error(`Export of shot ${i + 1} (${code}) failed`, { cause });
+      }
+      const name = exportFileName(
+        project.name,
+        preset.id,
+        code,
+        preset.fileType,
+        i,
+      );
+      zip.file(perLanguageFolders ? `${slugify(code)}/${name}` : name, blob);
     }
-    zip.file(exportFileName(project.name, preset.id, preset.fileType, i), blob);
   }
 
   const archive = await zip.generateAsync({ type: "blob" });

@@ -57,12 +57,12 @@ comp/ ─┘
 
 ## `lib/` im Detail
 
-| Ordner     | Verantwortung                                                                                 | Module                                                                                  |
-| ---------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken     | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version` |
-| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren        | `render`, `export`, `image`                                                             |
-| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung | `idb-storage`, `image-store`, `migrate-images`, `project-file`, `upload`                |
-| (root)     | framework-unabhängige Kleinteile                                                              | `utils`                                                                                 |
+| Ordner     | Verantwortung                                                                                              | Module                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `model/`   | Domänentypen, Presets und die Validierungs-/Allowlist-Regeln, die das Modell einschränken                  | `types`, `presets`, `layout-presets`, `defaults`, `limits`, `color`, `fonts`, `version`       |
+| `render/`  | aus einem Shot Pixel machen — Canvas zeichnen, Bilder dekodieren, PNG/JPEG exportieren                     | `render`, `export`, `image`                                                                   |
+| `storage/` | Laden/Speichern — IndexedDB-Adapter, Bild-Store, `.studio`-Projektdateien, Upload-Validierung, Migrationen | `idb-storage`, `image-store`, `migrate-images`, `migrate-languages`, `project-file`, `upload` |
+| (root)     | framework-unabhängige Kleinteile                                                                           | `utils`                                                                                       |
 
 Abhängigkeitsrichtung innerhalb `lib/`: `storage/` und `render/` bauen auf
 `model/` auf, `model/` nur auf `utils`. Keine Zyklen zwischen den Gruppen.
@@ -95,6 +95,36 @@ vollen Namen als Schlüssel und gruppieren daher nie versehentlich; `appName`
 ist die Ausnahme für Ordner, deren Name die Konvention nicht trägt. Die Galerie
 kennt damit drei Ebenen — Wurzel → App (`?app=`) → Release (`?folder=`) —
 ohne dass ein Ordner je einen Ordner enthält.
+
+## Sprachen: ein Shot ist eine Position
+
+Weil eine lokalisierte App pro Sprache anders aussieht, unterscheiden sich
+**Screenshot und Text**. Ein `Shot` ist deshalb nicht mehr „ein Bild mit
+Untertitel", sondern eine **Position** in der Store-Auflistung („das dritte
+Bild"), die jede Sprache mit ihrem eigenen Bild und Text füllt:
+
+```
+Shot.images:   Record<langCode, imageId | null>
+Shot.captions: Record<langCode, { claim, sub }>
+Project.languages: Language[]   // erste ist die Standardsprache
+```
+
+Die Geräte-Platzierung (`offX`/`offY`/`scale`) bleibt geteilt — sie ist eine
+Layout-Entscheidung über die Position, keine Übersetzung.
+
+- **Lesen immer über `model/caption`** (`captionFor`, `imageIdFor`): ein noch
+  nicht gefüllter Eintrag fehlt schlicht, statt als Fehler aufzutreten.
+- **Der Editor kennt eine aktive Sprache** (`LanguageContext`, reiner UI-State):
+  eine Stelle zum Umschalten, Canvas, Karten und Uploads folgen.
+- **`addShots` füllt erst Lücken, dann hängt es an.** Den englischen Satz in ein
+  Projekt zu werfen, dessen deutscher schon steht, vervollständigt die
+  vorhandenen Positionen — statt eine zweite Reihe daneben zu legen.
+- **Export** schreibt bei mehreren Sprachen einen ZIP-Ordner je Sprache; der
+  Code steht zusätzlich im Dateinamen.
+- **Migration v6 → v7** ist bewusst mechanisch: jedes bestehende Projekt bekommt
+  _eine_ Sprache, geraten aus seinem Namen („Telly (iOS) (DE)"). Sie verschiebt
+  keine Inhalte zwischen Projekten — ein Fehlgriff ist ein Etikett, kein
+  Datenverlust.
 
 ## Bilder liegen außerhalb des States
 

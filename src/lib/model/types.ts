@@ -2,10 +2,13 @@
  * Core domain types for Mocko.
  *
  * The model is intentionally flat: a Project holds one set of global styling
- * (preset/format, background, text, device) plus an ordered list of shots
- * (screenshots referenced by content id, with a per-shot caption). Every shot shares the same
- * global styling, which keeps a store listing visually consistent — the only
- * per-shot overrides are the device's position and (optionally) its size.
+ * (preset/format, background, text, device), the languages it is maintained in,
+ * and an ordered list of shot positions. Every shot shares the same global
+ * styling, which keeps a store listing visually consistent — the only per-shot
+ * overrides are the device's position and (optionally) its size.
+ *
+ * One project therefore covers one store format in every language: the six
+ * variants a cross-platform release used to need collapse to one per format.
  *
  * Sizes that scale with the artboard (font sizes, device width, top space) are
  * stored as fractions (0..1) so they stay resolution-independent between the
@@ -85,20 +88,44 @@ export type DeviceStyle = {
   topSpace: number;
 };
 
-/** A single uploaded screenshot with its caption. */
-export type Shot = {
-  id: string;
-  /**
-   * Content id of the screenshot in the image store, or null for the empty
-   * placeholder. The bytes live outside the persisted state so that keeping
-   * many releases neither bloats every autosave nor stores the same unchanged
-   * screenshot once per version — see `storage/image-store`.
-   */
-  imageId: string | null;
+/** A language a project maintains screenshots and captions for. */
+export type Language = {
+  /** BCP-47-ish code, used verbatim in export folder and file names. */
+  code: string;
+  /** Human-readable label shown in the UI. */
+  label: string;
+};
+
+/** The text over one screenshot, in one language. */
+export type Caption = {
   /** Headline shown above the device. */
   claim: string;
   /** Optional supporting line shown under the claim. */
   sub: string;
+};
+
+/**
+ * One position in a store listing, across every language.
+ *
+ * A localized app looks different per language, so both the screenshot and the
+ * caption vary — the shot is the *position* ("the third screenshot"), and each
+ * language fills it with its own image and text. The device's placement is
+ * shared: it is a layout decision about the position, not about a translation.
+ *
+ * Entries are absent until a language is filled in; read them through
+ * `model/caption` rather than indexing directly.
+ */
+export type Shot = {
+  id: string;
+  /**
+   * Content id of the screenshot per language code (see `storage/image-store`),
+   * or null where a language has none yet. The bytes live outside the persisted
+   * state so that keeping many releases neither bloats every autosave nor
+   * stores the same unchanged screenshot once per version.
+   */
+  images: Record<string, string | null>;
+  /** Caption per language code; a missing key means "not translated yet". */
+  captions: Record<string, Caption>;
   /**
    * Horizontal device offset as a fraction of canvas width (-0.5..+0.5);
    * 0 keeps the device horizontally centered.
@@ -127,7 +154,13 @@ export type Project = {
   background: Background;
   text: TextStyle;
   device: DeviceStyle;
-  /** Ordered screenshots. */
+  /**
+   * Languages this project maintains, in display order. Never empty; the first
+   * is the default — the one the editor opens on and a single-language export
+   * uses.
+   */
+  languages: Language[];
+  /** Ordered screenshot positions. */
   shots: Shot[];
   /**
    * Owning folder id, or `null` when the project lives at the gallery root.
