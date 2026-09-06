@@ -20,7 +20,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /** Resolves a source to a decoded image, or null if it is empty or fails. */
-export async function loadImageOrNull(
+async function loadImageOrNull(
   src: string | null,
 ): Promise<HTMLImageElement | null> {
   if (!src) return null;

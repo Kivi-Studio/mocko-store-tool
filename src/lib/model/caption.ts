@@ -22,11 +22,6 @@ export function imageIdFor(shot: Shot, code: string): string | null {
   return shot.images[code] ?? null;
 }
 
-/** True when the shot has a screenshot for every one of `codes`. */
-export function isComplete(shot: Shot, codes: readonly string[]): boolean {
-  return codes.every((code) => imageIdFor(shot, code) !== null);
-}
-
 /**
  * Every image id a set of projects still points at — the survivors of an image
  * store sweep. An image is shared across languages and releases, so it may only

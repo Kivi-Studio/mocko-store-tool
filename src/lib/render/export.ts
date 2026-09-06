@@ -34,7 +34,7 @@ export function exportFileName(
 }
 
 /** Renders a single shot at full resolution to a Blob. */
-export async function renderShotToBlob(
+async function renderShotToBlob(
   project: Project,
   shot: Shot,
   language: string,
