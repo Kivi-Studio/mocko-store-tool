@@ -64,6 +64,7 @@ jobs:
           # list-options -a makes the server list dotfiles, otherwise mirror
           # neither sees nor cleans up the remote .htaccess.
           lftp -u "$FTP_USER,$FTP_PASS" "ftp://$FTP_HOST" -e "
+            set cmd:fail-exit yes;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate yes;

@@ -90,8 +90,8 @@ nvm use
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
-cd kivi-studio-store-tool
+git clone https://github.com/Kivi-Studio/mocko-store-tool.git
+cd mocko-store-tool
 
 # 2. Install dependencies (deterministic, from the lockfile)
 npm ci          # or: npm install
