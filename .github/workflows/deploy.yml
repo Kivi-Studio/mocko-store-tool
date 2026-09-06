@@ -1,0 +1,76 @@
+name: Deploy to Netcup
+
+# Manual only: a deploy is a deliberate act, and mirror --delete is destructive
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list what would change, upload nothing)"
+        type: boolean
+        default: true
+
+# Never let two deploys write to the server at the same time; queue instead.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Use a dedicated FTP user whose home directory IS the subdomain's document
+  # root (Plesk: additional FTP account, home = the mocko.kivistudio.de folder).
+  # The login then lands in the document root, REMOTE_DIR stays "." and
+  # mirror --delete can only ever touch Mocko's files, never the main site's.
+  REMOTE_DIR: .
+  # The build stamp in the footer uses local time; make CI match Germany.
+  TZ: Europe/Berlin
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Lint, typecheck, format check and tests. A red check never deploys.
+      - run: npm run check
+
+      # next.config.ts sets output: "export", so the site lands in out/.
+      - run: npm run build
+
+      # public/.htaccess carries the security headers, caching rules and the
+      # SPA fallback. Without it deep links and the offline update path break.
+      - name: Check .htaccess is in the build
+        run: test -f out/.htaccess
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Deploy via FTPS
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          # A push is always a real deploy; a manual run honours the checkbox.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          FLAGS="--reverse --delete --verbose --parallel=4"
+          if [ "$DRY_RUN" = "true" ]; then FLAGS="$FLAGS --dry-run"; fi
+          # ssl-force fails the run rather than falling back to plaintext FTP.
+          # list-options -a makes the server list dotfiles, otherwise mirror
+          # neither sees nor cleans up the remote .htaccess.
+          lftp -u "$FTP_USER,$FTP_PASS" "ftp://$FTP_HOST" -e "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate yes;
+            set ftp:passive-mode true;
+            set ftp:list-options -a;
+            pwd;
+            ls;
+            mirror $FLAGS out/ $REMOTE_DIR;
+            quit
+          "
