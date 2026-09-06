@@ -14,8 +14,11 @@ import type {
 import { isPresetId } from "@/lib/model/presets";
 import { safeFont } from "@/lib/model/fonts";
 import { safeColor } from "@/lib/model/color";
-import { isValidLangCode, labelForCode } from "@/lib/model/locales";
-import { languageForProject } from "@/lib/storage/migrate-languages";
+import {
+  DEFAULT_LANGUAGE,
+  isValidLangCode,
+  labelForCode,
+} from "@/lib/model/locales";
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_DEVICE,
@@ -418,11 +421,15 @@ function normalizeShotScale(raw: unknown): number | null {
 
 /**
  * The languages a project is imported with: the ones the file names, or — for
- * a file written before languages existed — a single one guessed from the
- * project's own name, the same way the local migration guesses it.
+ * a file written before languages existed — the default one.
+ *
+ * Nothing is inferred from the project's name. A file from the
+ * one-project-per-language era therefore arrives labelled with the default
+ * language regardless of what it actually holds; saying which language it is
+ * belongs to the merge step, where it is stated rather than guessed.
  */
-function normalizeLanguages(raw: unknown, name: string): Language[] {
-  if (!Array.isArray(raw)) return [languageForProject(name)];
+function normalizeLanguages(raw: unknown): Language[] {
+  if (!Array.isArray(raw)) return [{ ...DEFAULT_LANGUAGE }];
   const languages: Language[] = [];
   const seen = new Set<string>();
   for (const entry of raw.slice(0, MAX_LANGUAGES_PER_PROJECT)) {
@@ -438,7 +445,7 @@ function normalizeLanguages(raw: unknown, name: string): Language[] {
     });
   }
   // A file that names no usable language still has to end up with one.
-  return languages.length ? languages : [languageForProject(name)];
+  return languages.length ? languages : [{ ...DEFAULT_LANGUAGE }];
 }
 
 async function normalizeShot(
@@ -564,7 +571,7 @@ async function buildProjectFromRaw(
     typeof raw.name === "string" && raw.name.trim()
       ? raw.name
       : "Imported project";
-  const languages = normalizeLanguages(raw.languages, name);
+  const languages = normalizeLanguages(raw.languages);
 
   const [background, shots] = await Promise.all([
     normalizeBackground(zip, raw.background),

@@ -376,21 +376,26 @@ describe("addShots across languages", () => {
 });
 
 describe("mergeProjects", () => {
-  const variant = (name: string, code: string, image: string) => {
+  /** A project as it arrives from an import: one (default) language. */
+  const variant = (name: string, image: string) => {
     const id = store().createProject(name);
-    store().setDefaultLanguage(id, code);
-    store().addLanguage(id, { code, label: code.toUpperCase() });
-    store().setDefaultLanguage(id, code);
-    store().removeLanguage(id, LANG);
-    store().addShots(id, code, [image]);
+    store().addShots(id, LANG, [image]);
     return id;
   };
+  const DE = { code: "de", label: "German" };
+  const EN = { code: "en", label: "English" };
 
   it("folds the sources into the first project and removes the rest", () => {
-    const de = variant("Telly (DE)", "de", "de-1");
-    const en = variant("Telly (EN)", "en", "en-1");
+    const de = variant("Telly (DE)", "de-1");
+    const en = variant("Telly (EN)", "en-1");
 
-    const merged = store().mergeProjects([de, en], "Telly")!;
+    const merged = store().mergeProjects(
+      [
+        { id: de, language: DE },
+        { id: en, language: EN },
+      ],
+      "Telly",
+    )!;
 
     expect(merged).toBe(de);
     expect(store().projects[en]).toBeUndefined();
@@ -404,28 +409,52 @@ describe("mergeProjects", () => {
   });
 
   it("refuses fewer than two projects", () => {
-    const de = variant("Telly (DE)", "de", "de-1");
-    expect(store().mergeProjects([de], "Telly")).toBeNull();
+    const de = variant("Telly (DE)", "de-1");
+    expect(
+      store().mergeProjects([{ id: de, language: DE }], "Telly"),
+    ).toBeNull();
     expect(store().mergeProjects([], "Telly")).toBeNull();
+    // An id that no longer exists does not count towards the two.
+    expect(
+      store().mergeProjects(
+        [
+          { id: de, language: DE },
+          { id: "gone", language: EN },
+        ],
+        "Telly",
+      ),
+    ).toBeNull();
     expect(store().projects[de]).toBeDefined();
   });
 
   it("uniquifies a merged name that a sibling already has", () => {
     store().createProject("Telly");
-    const de = variant("Telly (DE)", "de", "de-1");
-    const en = variant("Telly (EN)", "en", "en-1");
+    const de = variant("Telly (DE)", "de-1");
+    const en = variant("Telly (EN)", "en-1");
 
-    const merged = store().mergeProjects([de, en], "Telly")!;
+    const merged = store().mergeProjects(
+      [
+        { id: de, language: DE },
+        { id: en, language: EN },
+      ],
+      "Telly",
+    )!;
 
     expect(store().projects[merged].name).toBe("Telly (2)");
   });
 
   it("is a single undo step", () => {
-    const de = variant("Telly (DE)", "de", "de-1");
-    const en = variant("Telly (EN)", "en", "en-1");
+    const de = variant("Telly (DE)", "de-1");
+    const en = variant("Telly (EN)", "en-1");
     useProjectStore.temporal.getState().clear();
 
-    store().mergeProjects([de, en], "Telly");
+    store().mergeProjects(
+      [
+        { id: de, language: DE },
+        { id: en, language: EN },
+      ],
+      "Telly",
+    );
     expect(store().projects[en]).toBeUndefined();
 
     useProjectStore.temporal.getState().undo();

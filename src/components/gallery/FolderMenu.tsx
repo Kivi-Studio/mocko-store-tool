@@ -195,9 +195,9 @@ export function FolderMenu({
         open={mergeOpen}
         onOpenChange={setMergeOpen}
         projects={folderProjects}
-        onMerge={(ids, name) => {
-          if (mergeProjects(ids, name)) {
-            toast.success(`Merged ${ids.length} projects into “${name}”`);
+        onMerge={(parts, name) => {
+          if (mergeProjects(parts, name)) {
+            toast.success(`Merged ${parts.length} projects into “${name}”`);
           }
         }}
       />

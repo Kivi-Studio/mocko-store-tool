@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Merge } from "lucide-react";
-import type { Project } from "@/lib/model/types";
-import { detectLanguageGroups, languageOf } from "@/lib/model/merge";
+import { Merge } from "lucide-react";
+import type { Language, Project } from "@/lib/model/types";
+import { LOCALES, labelForCode } from "@/lib/model/locales";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -17,14 +18,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Folds a release's per-language projects into one project per store format.
  *
- * Nothing happens without confirmation: this is the one step that moves content
- * between projects, so it shows exactly what would be combined into what, and
- * only offers sets whose names leave no doubt — same name once the locale
- * suffix is dropped, one distinct language each.
+ * Nothing is inferred from the project names: you tick the projects that are
+ * the same listing and say which language each one is. Names from the
+ * one-project-per-language era were written in whatever way suited at the time,
+ * and a rule that reads them all correctly is a rule that will eventually read
+ * one wrongly — so this asks instead.
+ *
+ * The dialog stays open after a merge and the list shrinks, so a folder is
+ * worked through in one sitting.
  */
 export function MergeLanguagesDialog({
   open,
@@ -34,31 +46,50 @@ export function MergeLanguagesDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The folder's projects, in gallery order. */
+  /** The folder's projects, live from the store, in gallery order. */
   projects: Project[];
-  onMerge: (ids: string[], name: string) => void;
+  onMerge: (parts: { id: string; language: Language }[], name: string) => void;
 }) {
-  const groups = detectLanguageGroups(projects);
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [codes, setCodes] = useState<Record<string, string>>({});
+  const [name, setName] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
 
-  const toggle = (name: string) =>
-    setSkipped((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+  // Only a project holding exactly one language can be reassigned; one that
+  // already maintains several is a finished merge and has nothing to state.
+  const candidates = projects.filter((p) => p.languages.length === 1);
+  const done = projects.filter((p) => p.languages.length > 1);
 
-  const chosen = groups.filter((g) => !skipped.has(g.name));
+  const codeOf = (p: Project) => codes[p.id] ?? p.languages[0].code;
+
+  const toggle = (project: Project) => {
+    const next = new Set(selected);
+    if (next.has(project.id)) next.delete(project.id);
+    else next.add(project.id);
+    setSelected(next);
+    if (!nameTouched) {
+      const first = projects.find((p) => next.has(p.id));
+      setName(first ? first.name : "");
+    }
+  };
+
+  const parts = projects
+    .filter((p) => selected.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      language: { code: codeOf(p), label: labelForCode(codeOf(p)) },
+    }));
+
+  const duplicateCode =
+    new Set(parts.map((p) => p.language.code)).size !== parts.length;
+  const canMerge = parts.length >= 2 && name.trim() !== "" && !duplicateCode;
 
   const submit = () => {
-    for (const group of chosen) {
-      onMerge(
-        group.projects.map((p) => p.id),
-        group.name,
-      );
-    }
-    onOpenChange(false);
+    if (!canMerge) return;
+    onMerge(parts, name.trim());
+    setSelected(new Set());
+    setName("");
+    setNameTouched(false);
   };
 
   return (
@@ -67,53 +98,98 @@ export function MergeLanguagesDialog({
         <DialogHeader>
           <DialogTitle>Merge by language</DialogTitle>
           <DialogDescription>
-            {groups.length === 0
-              ? "Nothing to merge — this needs at least two projects whose names match apart from a language suffix, like “Telly (iOS) (DE)” and “Telly (iOS) (EN)”."
-              : "Each set below becomes one project holding every language. The screenshots and captions move over; positions are matched by order."}
+            Tick the projects that are the same listing in different languages
+            and say which language each one is. They become one project;
+            positions are matched by order.
           </DialogDescription>
         </DialogHeader>
 
-        {groups.length > 0 && (
-          <ScrollArea className="max-h-72 rounded-lg border">
-            <div className="grid gap-1 p-2">
-              {groups.map((group) => (
-                <Label
-                  key={group.name}
-                  className="hover:bg-muted/60 items-start gap-3 rounded-md p-2"
-                >
-                  <Checkbox
-                    checked={!skipped.has(group.name)}
-                    onCheckedChange={() => toggle(group.name)}
-                    className="mt-0.5"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="text-muted-foreground block text-xs font-normal">
-                      {group.projects.map((p) => p.name).join(" + ")}
-                    </span>
-                    <span className="mt-0.5 flex items-center gap-1.5">
-                      <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
-                      <span className="truncate">{group.name}</span>
-                      <span className="text-muted-foreground text-xs font-normal">
-                        {group.projects
-                          .map((p) => languageOf(p).code)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                  </span>
-                </Label>
-              ))}
+        {candidates.length < 2 ? (
+          <p className="text-muted-foreground text-sm">
+            This folder has nothing left to merge.
+          </p>
+        ) : (
+          <div className="grid gap-4">
+            <ScrollArea className="max-h-64 rounded-lg border">
+              <div className="grid gap-1 p-2">
+                {candidates.map((p) => (
+                  <div
+                    key={p.id}
+                    className="hover:bg-muted/60 flex items-center gap-3 rounded-md p-2"
+                  >
+                    <Label className="min-w-0 flex-1 gap-3">
+                      <Checkbox
+                        checked={selected.has(p.id)}
+                        onCheckedChange={() => toggle(p)}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    </Label>
+                    <Select
+                      value={codeOf(p)}
+                      onValueChange={(v) =>
+                        setCodes((prev) => ({ ...prev, [p.id]: String(v) }))
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={`Language of ${p.name}`}
+                        className="w-40"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOCALES.map((l) => (
+                          <SelectItem key={l.code} value={l.code}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <div className="grid gap-2">
+              <Label htmlFor="merged-name">Name of the merged project</Label>
+              <Input
+                id="merged-name"
+                value={name}
+                placeholder="e.g. Telly (iOS)"
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameTouched(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+              />
+              {duplicateCode && (
+                <p className="text-destructive text-sm">
+                  Two of the selected projects are set to the same language.
+                </p>
+              )}
             </div>
-          </ScrollArea>
+
+            {done.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                Already merged:{" "}
+                {done
+                  .map(
+                    (p) =>
+                      `${p.name} (${p.languages.map((l) => l.code).join(", ")})`,
+                  )
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
         )}
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
-            {groups.length === 0 ? "Close" : "Cancel"}
-          </DialogClose>
-          {groups.length > 0 && (
-            <Button onClick={submit} disabled={chosen.length === 0}>
+          <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
+          {candidates.length >= 2 && (
+            <Button onClick={submit} disabled={!canMerge}>
               <Merge className="size-4" />
-              Merge {chosen.length} {chosen.length === 1 ? "set" : "sets"}
+              Merge {parts.length} projects
             </Button>
           )}
         </DialogFooter>

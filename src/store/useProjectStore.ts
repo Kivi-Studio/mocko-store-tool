@@ -20,6 +20,7 @@ import type {
 } from "@/lib/model/types";
 import { captionFor, imageIdFor } from "@/lib/model/caption";
 import { mergeProjects as foldProjects } from "@/lib/model/merge";
+import type { MergePart } from "@/lib/model/merge";
 import { makeFolder, makeProject, makeShot } from "@/lib/model/defaults";
 import {
   backupLegacyState,
@@ -128,12 +129,16 @@ export type ProjectStore = {
   /** Deletes a folder; its projects fall back to the root, they are not removed. */
   deleteFolder: (id: string) => void;
   /**
-   * Folds several single-language projects into one that holds each of their
-   * languages, and removes the originals. The survivor keeps the first
-   * project's id, design and place in the gallery. Returns its id, or `null`
-   * when fewer than two of the ids exist.
+   * Folds several projects into one that holds each of their languages, and
+   * removes the originals. Which project is which language is stated per
+   * entry, not read off its name. The survivor keeps the first project's id,
+   * design and place in the gallery. Returns its id, or `null` when fewer than
+   * two of the given projects exist.
    */
-  mergeProjects: (ids: string[], name: string) => string | null;
+  mergeProjects: (
+    parts: { id: string; language: Language }[],
+    name: string,
+  ) => string | null;
   /** Moves a project into a folder, or to the root with `null`. */
   moveProjectToFolder: (projectId: string, folderId: string | null) => void;
 
@@ -501,17 +506,23 @@ export const useProjectStore = create<ProjectStore>()(
           return result.folderId;
         },
 
-        mergeProjects: (ids, name) => {
+        mergeProjects: (parts, name) => {
           const s = get();
-          const sources = ids.map((id) => s.projects[id]).filter(Boolean);
-          if (sources.length < 2) return null;
+          const resolved: MergePart[] = parts
+            .filter((part) => s.projects[part.id])
+            .map((part) => ({
+              project: s.projects[part.id],
+              language: part.language,
+            }));
+          if (resolved.length < 2) return null;
 
+          const sources = resolved.map((r) => r.project);
           const gone = new Set(sources.slice(1).map((p) => p.id));
           const taken = namesInFolder(s, sources[0].folderId).filter(
             (n) => !sources.some((p) => p.name === n),
           );
           const merged = foldProjects(
-            sources,
+            resolved,
             uniqueName(name.trim() || sources[0].name, taken),
           );
 

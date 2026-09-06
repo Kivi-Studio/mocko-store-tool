@@ -293,7 +293,7 @@ describe("language round-trip", () => {
     expect(captionFor(parsed.shots[0], "en").claim).toBe("All your shows");
   });
 
-  it("reads a pre-language file as one project in the language its name names", async () => {
+  it("reads a pre-language file as one default-language project", async () => {
     const blob = await archiveFrom(
       {
         format: PROJECT_FORMAT,
@@ -314,12 +314,14 @@ describe("language round-trip", () => {
 
     const parsed = await readProjectFile(blob);
 
-    expect(parsed.languages).toEqual([{ code: "de", label: "German" }]);
-    expect(captionFor(parsed.shots[0], "de").claim).toBe("Alle Serien");
-    expect(imageIdFor(parsed.shots[0], "de")).toMatch(/^[0-9a-f]{64}$/);
+    // The name says "(DE)", but nothing is inferred from it: which language a
+    // legacy project holds is stated during the merge, not parsed here.
+    expect(parsed.languages).toEqual([DEFAULT_LANGUAGE]);
+    expect(captionFor(parsed.shots[0], LANG).claim).toBe("Alle Serien");
+    expect(imageIdFor(parsed.shots[0], LANG)).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("falls back to the default language when the name says nothing", async () => {
+  it("uses the default language for a file that names none", async () => {
     const blob = await archiveFrom({
       format: PROJECT_FORMAT,
       version: 5,

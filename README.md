@@ -22,8 +22,9 @@ lokal in IndexedDB gespeichert (kein Backend, keine Anmeldung).
 - **Releases versionieren:** Ordner duplizieren oder per **„Neue Version…"**
   unter `<App> X.Y.Z` kopieren — auf Wunsch mit geleerten Screenshots, wobei
   Anzahl, Captions und Layout erhalten bleiben.
-- **Nach Sprache zusammenführen:** bestehende „App (iOS) (DE)"/„App (iOS) (EN)"-
-  Paare lassen sich mit Vorschau zu einem mehrsprachigen Projekt falten.
+- **Nach Sprache zusammenführen:** bestehende Ein-Sprach-Projekte lassen sich
+  zu einem mehrsprachigen falten — du hakst sie ab und sagst, welche Sprache
+  jedes ist; geraten wird nichts.
 - **Caption-Ansicht je Release:** alle Texte eines Ordners als Raster —
   Zeilen sind Shot-Positionen, Spalten die Projekte —, direkt editierbar,
   statt sich durch jedes Projekt einzeln zu klicken.

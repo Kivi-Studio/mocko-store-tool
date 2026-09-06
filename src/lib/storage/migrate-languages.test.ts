@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  languageForProject,
-  migrateProjectToLanguages,
-} from "@/lib/storage/migrate-languages";
+import { migrateProjectToLanguages } from "@/lib/storage/migrate-languages";
 import { captionFor, imageIdFor } from "@/lib/model/caption";
 import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
 
@@ -31,34 +28,16 @@ const shot = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe("languageForProject", () => {
-  it("takes the locale a name advertises", () => {
-    expect(languageForProject("Telly (iOS) (DE)")).toEqual({
-      code: "de",
-      label: "German",
-    });
-  });
-
-  it("ignores a bracketed qualifier that is not a locale", () => {
-    expect(languageForProject("Telly (iOS)")).toEqual(DEFAULT_LANGUAGE);
-  });
-
-  it("takes the last locale when a name carries several", () => {
-    expect(languageForProject("App (de) (fr)").code).toBe("fr");
-  });
-
-  it("falls back to the default for a plain name", () => {
-    expect(languageForProject("Marketing")).toEqual(DEFAULT_LANGUAGE);
-  });
-});
-
 describe("migrateProjectToLanguages", () => {
-  it("files a project's content under the language its name names", () => {
+  it("files a project's content under the default language", () => {
     const project = migrateProjectToLanguages(v6("Telly (iOS) (DE)", [shot()]));
+    const code = DEFAULT_LANGUAGE.code;
 
-    expect(project.languages).toEqual([{ code: "de", label: "German" }]);
-    expect(imageIdFor(project.shots[0], "de")).toBe("img-1");
-    expect(captionFor(project.shots[0], "de")).toEqual({
+    // Nothing is read off the name — saying which language this is belongs to
+    // the merge step, where it is stated rather than guessed.
+    expect(project.languages).toEqual([DEFAULT_LANGUAGE]);
+    expect(imageIdFor(project.shots[0], code)).toBe("img-1");
+    expect(captionFor(project.shots[0], code)).toEqual({
       claim: "Alle Serien",
       sub: "an einem Ort",
     });
@@ -91,6 +70,7 @@ describe("migrateProjectToLanguages", () => {
   });
 
   it("moves no content between projects — each keeps its own", () => {
+    const code = DEFAULT_LANGUAGE.code;
     const de = migrateProjectToLanguages(
       v6("Telly (DE)", [shot({ imageId: "de-img", claim: "Alle Serien" })]),
     );
@@ -98,11 +78,8 @@ describe("migrateProjectToLanguages", () => {
       v6("Telly (EN)", [shot({ imageId: "en-img", claim: "All your shows" })]),
     );
 
-    expect(imageIdFor(de.shots[0], "de")).toBe("de-img");
-    expect(imageIdFor(en.shots[0], "en")).toBe("en-img");
-    // The German project knows nothing of English and vice versa: combining
-    // them is a separate, explicit step.
-    expect(imageIdFor(de.shots[0], "en")).toBeNull();
-    expect(imageIdFor(en.shots[0], "de")).toBeNull();
+    // Combining them — and saying which is which — is a separate, explicit step.
+    expect(imageIdFor(de.shots[0], code)).toBe("de-img");
+    expect(imageIdFor(en.shots[0], code)).toBe("en-img");
   });
 });

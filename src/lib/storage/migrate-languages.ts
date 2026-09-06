@@ -1,9 +1,5 @@
-import type { Caption, Language, Project, Shot } from "@/lib/model/types";
-import {
-  DEFAULT_LANGUAGE,
-  guessLangCode,
-  labelForCode,
-} from "@/lib/model/locales";
+import type { Caption, Project, Shot } from "@/lib/model/types";
+import { DEFAULT_LANGUAGE } from "@/lib/model/locales";
 import type {
   ImageStoreProject,
   ImageStoreShot,
@@ -27,18 +23,6 @@ import type {
 /** A v6 project, or anything close enough to read as one. */
 type RawProject = Partial<ImageStoreProject> & { name?: string };
 
-/**
- * The language to file a project's existing content under: the one its name
- * advertises ("Telly (iOS) (DE)"), falling back to the default.
- *
- * A wrong guess only mislabels — the screenshots and captions stay exactly
- * where they were, so it is fixed by renaming the language.
- */
-export function languageForProject(name: string): Language {
-  const code = guessLangCode(name);
-  return code ? { code, label: labelForCode(code) } : { ...DEFAULT_LANGUAGE };
-}
-
 /** Moves one shot's single image and caption under `code`. */
 function shotToLanguages(shot: ImageStoreShot, code: string): Shot {
   const caption: Caption = { claim: shot.claim ?? "", sub: shot.sub ?? "" };
@@ -57,7 +41,7 @@ function shotToLanguages(shot: ImageStoreShot, code: string): Shot {
 /** Gives a v6 project a single language and files its content under it. */
 export function migrateProjectToLanguages(raw: unknown): Project {
   const p = (raw ?? {}) as RawProject;
-  const language = languageForProject(p.name ?? "");
+  const language = { ...DEFAULT_LANGUAGE };
   return {
     ...(p as unknown as Project),
     languages: [language],
